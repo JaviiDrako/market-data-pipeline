@@ -1,0 +1,12 @@
+database:
+quality:
+sources:
+  binance:
+    symbols:
+      - BTCUSDT
+      - ETHUSDT
+      - SOLUSDT
+    historical:
+      interval: 1m
+      days: 365
+
