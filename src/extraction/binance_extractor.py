@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from src.clients.binance.client import BinanceClient
@@ -17,33 +16,19 @@ class BinanceExtractor:
         self._source = self._settings.get_source("binance")
         self._symbols: list[str] = self._source.get("symbols", [])
 
-        historical = self._source.get("historical", {})
-        self._interval: str = historical.get("interval", "1m")
-        self._days: int = historical.get("days", 365)
+        klines = self._source.get("historical", {})
+        self._interval: str = klines.get("interval", "1m")
 
-    def extract_historical_klines(self) -> list[dict[str, Any]]:
-        """
-        Extract recent klines.
-
-        NOTE:
-        This is a temporary implementation used to validate the extraction
-        pipeline. The bootstrap (full historical load) will be implemented
-        as a separate pipeline.
-        """
+    def extract_latest_klines(self) -> list[dict[str, Any]]:
+        """Extract the latest closed kline for every configured symbol."""
 
         extracted_data: list[dict[str, Any]] = []
-
-        end_time = int(datetime.now(timezone.utc).timestamp() * 1000)
-        start_time = int(
-            (datetime.now(timezone.utc) - timedelta(minutes=5)).timestamp() * 1000
-        )
 
         for symbol in self._symbols:
             klines = self._client.get_historical_klines(
                 symbol=symbol,
                 interval=self._interval,
-                start_time=start_time,
-                end_time=end_time,
+                limit=1,
             )
 
             for kline in klines:
