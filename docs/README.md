@@ -1,8 +1,12 @@
 # Documentation
 
-This directory contains all the technical documentation for the Market Data Pipeline project.
+This directory contains the technical documentation for the Market Data Pipeline project.
 
-## Structure
+The documentation evolves together with the implementation and records the architecture, database design and engineering decisions taken during development.
+
+---
+
+# Structure
 
 ```
 docs/
@@ -10,32 +14,44 @@ docs/
 ├── adr/
 ├── architecture/
 ├── database/
-├── diagrams/
-└── roadmap.md
+└── diagrams/
 ```
-
-## Contents
-
-### ADR
-
-Architecture Decision Records documenting the most important architectural decisions taken during the project.
-
-### Architecture
-
-General architecture documentation, warehouse architecture and orchestration design.
-
-### Database
-
-Physical database documentation for every Medallion layer.
-
-### Diagrams
-
-Architecture and workflow diagrams.
-
-### Roadmap
-
-Project implementation roadmap and development progress.
 
 ---
 
-Documentation is updated together with the project implementation to keep both synchronized.
+# Contents
+
+## ADR
+
+Architecture Decision Records describing the main architectural decisions adopted during the project.
+
+---
+
+## Architecture
+
+General documentation about the project architecture, Medallion Architecture and orchestration design.
+
+---
+
+## Database
+
+Physical database documentation for every layer of the Data Warehouse.
+
+Currently documented:
+
+- Bronze Layer
+
+Future documentation:
+
+- Silver Layer
+- Gold Layer
+
+---
+
+## Diagrams
+
+Architecture and workflow diagrams illustrating the data pipeline.
+
+---
+
+Documentation should always be updated together with the implementation to keep both synchronized.

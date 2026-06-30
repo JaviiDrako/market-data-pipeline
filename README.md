@@ -27,15 +27,17 @@ Currently implemented:
 - PostgreSQL Data Warehouse.
 - Medallion Architecture.
 - Bronze schema physical design.
+- Configuration-driven symbol management.
 - Binance REST API integration.
 - Binance market data extraction.
-- Configuration-driven symbol management.
+- Bronze loading pipeline.
+- Pipeline execution monitoring.
 - Multi-provider ready architecture.
 
 Planned:
 
-- Bronze Loader.
 - Airflow DAG orchestration.
+- Data Quality layer.
 - Silver transformations with dbt.
 - Gold analytical models.
 - Technical indicators.
@@ -46,7 +48,7 @@ Planned:
 
 # Architecture
 
-The project follows the Medallion Architecture.
+The project currently implements the Bronze ingestion pipeline.
 
 ```
                 Binance REST API
@@ -56,6 +58,9 @@ The project follows the Medallion Architecture.
                        │
                        ▼
              Binance Extractor
+                       │
+                       ▼
+             Pipeline Monitor
                        │
                        ▼
               Bronze Loader
@@ -104,6 +109,7 @@ market-data-pipeline/
 ├── docs/
 ├── src/
 │   ├── clients/
+│   ├── common/
 │   ├── config/
 │   ├── extraction/
 │   ├── loading/
@@ -125,8 +131,10 @@ Project documentation is located under the `docs/` directory.
 | Bronze Physical Schema | ✅ |
 | Binance Client | ✅ |
 | Binance Extraction | ✅ |
-| Bronze Loader | 🚧 |
+| Bronze Loader | ✅ |
+| Pipeline Monitor | ✅ |
 | Airflow DAGs | ⏳ |
+| Data Quality | ⏳ |
 | dbt Models | ⏳ |
 | Silver Layer | ⏳ |
 | Gold Layer | ⏳ |
@@ -143,10 +151,10 @@ Clone the repository.
 git clone <repository-url>
 ```
 
-Copy the local environment variables.
+Copy the environment variables.
 
 ```bash
-cp docker/local_variables.example docker/local_variables
+cp docker/.env.example docker/.env
 ```
 
 Start the services.
@@ -159,32 +167,14 @@ docker compose up
 
 # Documentation
 
-Additional documentation can be found inside the `docs/` directory.
+Additional documentation is available inside the `docs/` directory.
 
-The documentation includes:
+It includes:
 
 - Architecture
 - Database
-- ADRs (Architecture Decision Records)
+- ADRs
 - Diagrams
-- Roadmap
-
----
-
-# Repository Roadmap
-
-Current development roadmap:
-
-- Infrastructure
-- Bronze Layer
-- Binance Extraction
-- Bronze Loading
-- Airflow Orchestration
-- Silver Layer
-- Gold Layer
-- Technical Indicators
-- Dashboard
-- Trading Bot
 
 ---
 
