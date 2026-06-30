@@ -4,9 +4,9 @@
 
 The Bronze layer is the entry point of the Data Warehouse.
 
-Its responsibility is to persist raw market data exactly as it is received from external providers while applying only the minimum structural transformations required by the relational model.
+Its responsibility is to persist raw market data received from external providers while applying only the minimum structural transformations required by the relational model.
 
-The Bronze layer never performs business calculations or analytical transformations.
+No business calculations or analytical transformations are performed in this layer.
 
 ---
 
@@ -30,7 +30,7 @@ bronze/
 
 ├── pipeline_runs
 ├── binance_klines
-├── binance_current_price
+├── binance_price
 └── binance_ticker_24h
 ```
 
@@ -42,28 +42,21 @@ bronze/
 
 Stores metadata for every pipeline execution.
 
-It allows tracing:
+Each pipeline execution generates exactly one record.
 
-- execution time
-- pipeline status
-- execution duration
-- possible failures
-
-Every Bronze record references the pipeline execution that inserted it.
+Every Bronze record references the pipeline execution responsible for inserting it through `pipeline_run_id`.
 
 ---
 
-## Main Fields
+## Stored Information
 
-| Column | Description |
-|---------|-------------|
-| id | Pipeline execution identifier |
-| pipeline_name | Pipeline name |
-| status | SUCCESS / FAILED |
-| started_at | Execution start |
-| finished_at | Execution end |
-| duration_ms | Execution duration |
-| error_message | Error description if execution failed |
+- DAG execution identifier
+- Execution start time
+- Execution finish time
+- Pipeline status
+- Inserted rows
+- Updated rows
+- Error message
 
 ---
 
@@ -79,9 +72,9 @@ GET /api/v3/klines
 
 ## Purpose
 
-Stores candlestick (OHLCV) market data exactly as provided by Binance.
+Stores the latest one-minute candlestick received for each configured symbol during every pipeline execution.
 
-Each row represents one candle for one symbol and one timeframe.
+Each record represents one OHLCV candle exactly as returned by Binance.
 
 ---
 
@@ -89,12 +82,12 @@ Each row represents one candle for one symbol and one timeframe.
 
 - Symbol
 - Open Time
+- Close Time
 - Open Price
 - High Price
 - Low Price
 - Close Price
 - Volume
-- Close Time
 - Quote Asset Volume
 - Number of Trades
 - Taker Buy Base Volume
@@ -102,15 +95,7 @@ Each row represents one candle for one symbol and one timeframe.
 
 ---
 
-## Notes
-
-No indicators are calculated in Bronze.
-
-Candles remain exactly as received from Binance.
-
----
-
-# binance_current_price
+# binance_price
 
 ## Source Endpoint
 
@@ -123,8 +108,6 @@ GET /api/v3/ticker/price
 ## Purpose
 
 Stores the latest observed market price for each configured symbol.
-
-This endpoint provides a lightweight snapshot of the current market.
 
 ---
 
@@ -147,9 +130,9 @@ GET /api/v3/ticker/24hr
 
 ## Purpose
 
-Stores rolling 24-hour market statistics.
+Stores rolling 24-hour market statistics provided directly by Binance.
 
-These values are provided directly by Binance and are not calculated locally.
+No derived metrics are calculated locally.
 
 ---
 
@@ -158,14 +141,15 @@ These values are provided directly by Binance and are not calculated locally.
 Examples include:
 
 - Price Change
-- Price Change %
-- High
-- Low
+- Price Change Percentage
+- Weighted Average Price
+- High Price
+- Low Price
 - Volume
 - Quote Volume
-- Number of Trades
 - Bid Price
 - Ask Price
+- Number of Trades
 
 ---
 
@@ -181,6 +165,9 @@ Binance Client
 Binance Extractor
         │
         ▼
+Pipeline Monitor
+        │
+        ▼
 Bronze Loader
         │
         ▼
@@ -189,34 +176,13 @@ Bronze Tables
 
 ---
 
-# Naming Convention
-
-The Bronze layer uses:
-
-- snake_case
-- NUMERIC for decimal values
-- TIMESTAMP WITH TIME ZONE for timestamps
-- Provider-specific table names
-
-Examples:
-
-```
-bronze.binance_klines
-
-bronze.binance_current_price
-
-bronze.binance_ticker_24h
-```
-
----
-
 # Relationships
 
-The Bronze layer keeps relationships to a minimum.
+The Bronze layer maintains minimal relationships.
 
-Each data table references the corresponding pipeline execution through `pipeline_run_id`.
+Each market table references the corresponding pipeline execution through `pipeline_run_id`, allowing complete traceability of every ingestion process.
 
-No business relationships exist between market tables.
+No business relationships exist between market data tables.
 
 ---
 
@@ -225,11 +191,13 @@ No business relationships exist between market tables.
 Implemented:
 
 - Physical schema
-- Table definitions
-- PostgreSQL initialization script
+- PostgreSQL initialization
+- Binance extraction
+- Bronze loading
+- Pipeline execution monitoring
 
 Pending:
 
-- Bronze Loader
-- Data ingestion
-- Incremental loading
+- Data Quality validation
+- Incremental orchestration with Airflow
+- Historical bootstrap pipeline
