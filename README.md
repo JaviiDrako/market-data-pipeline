@@ -33,6 +33,7 @@ Currently implemented:
 - Bronze loading pipeline.
 - Pipeline execution monitoring.
 - Multi-provider ready architecture.
+- Data quality validation layer.
 
 Planned:
 
@@ -57,23 +58,26 @@ The project currently implements the Bronze ingestion pipeline.
                Binance Client
                        │
                        ▼
-             Binance Extractor
+               Binance Extractor
                        │
                        ▼
-             Pipeline Monitor
+                  Data Quality
                        │
                        ▼
-              Bronze Loader
+                Pipeline Monitor
                        │
                        ▼
-              Bronze Layer
-                       │
-                     dbt
+                Bronze Loader
                        │
                        ▼
-              Silver Layer
+                 Bronze Layer
                        │
-                     dbt
+                      dbt
+                       │
+                       ▼
+                  Silver Layer
+                       │
+                      dbt
                        │
                        ▼
                Gold Layer
@@ -133,8 +137,8 @@ Project documentation is located under the `docs/` directory.
 | Binance Extraction | ✅ |
 | Bronze Loader | ✅ |
 | Pipeline Monitor | ✅ |
+| Data Quality | ✅ |
 | Airflow DAGs | ⏳ |
-| Data Quality | ⏳ |
 | dbt Models | ⏳ |
 | Silver Layer | ⏳ |
 | Gold Layer | ⏳ |
