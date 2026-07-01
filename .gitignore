@@ -1,4 +1,20 @@
 .env
-__pycache__/
 *.pyc
 .pytest_cache/
+
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# dbt
+dbt/target/
+dbt/logs/
+
+# Local logs
+logs/
+
+# macOS / Linux
+.DS_Store

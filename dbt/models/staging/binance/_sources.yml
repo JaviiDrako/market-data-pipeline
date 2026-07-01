@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Raw Bronze layer populated by the Bronze ingestion pipeline.
+    schema: bronze
+
+    tables:
+
+      - name: binance_klines
+        description: Raw candlestick data extracted from the Binance Klines endpoint.
+
+      - name: binance_price
+        description: Raw current market prices extracted from the Binance Price endpoint.
+
+      - name: binance_ticker_24h
+        description: Raw rolling 24-hour market statistics extracted from the Binance 24hr Ticker endpoint.

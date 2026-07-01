@@ -1,0 +1,78 @@
+version: 2
+
+models:
+
+  - name: market_candles
+    description: Standardized historical candlestick data used as the foundation for analytical models and technical indicators.
+
+    columns:
+
+      - name: exchange
+        description: Exchange that produced the candlestick.
+        tests:
+          - not_null
+
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+
+      - name: interval
+        description: Candle timeframe (1m, 5m, 15m, 1h, etc.).
+        tests:
+          - not_null
+
+      - name: open_time
+        description: Candle opening timestamp.
+        tests:
+          - not_null
+
+      - name: close_time
+        description: Candle closing timestamp.
+        tests:
+          - not_null
+
+      - name: open_price
+        description: Opening price.
+        tests:
+          - not_null
+
+      - name: high_price
+        description: Highest traded price.
+        tests:
+          - not_null
+
+      - name: low_price
+        description: Lowest traded price.
+        tests:
+          - not_null
+
+      - name: close_price
+        description: Closing price.
+        tests:
+          - not_null
+
+  - name: market_snapshot
+    description: Historical market snapshots combining current price information with rolling 24-hour statistics.
+
+    columns:
+
+      - name: exchange
+        description: Exchange that produced the snapshot.
+        tests:
+          - not_null
+
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+
+      - name: snapshot_time
+        description: Timestamp representing when the snapshot was taken.
+        tests:
+          - not_null
+
+      - name: last_price
+        description: Latest traded price.
+        tests:
+          - not_null

@@ -1,0 +1,83 @@
+version: 2
+
+models:
+
+  - name: stg_binance_klines
+    description: Standardized Binance candlestick data used by downstream Silver models.
+
+    columns:
+
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+
+      - name: open_time
+        description: Candle opening timestamp.
+        tests:
+          - not_null
+
+      - name: close_time
+        description: Candle closing timestamp.
+        tests:
+          - not_null
+
+      - name: open_price
+        description: Candle opening price.
+        tests:
+          - not_null
+
+      - name: high_price
+        description: Highest traded price during the candle.
+        tests:
+          - not_null
+
+      - name: low_price
+        description: Lowest traded price during the candle.
+        tests:
+          - not_null
+
+      - name: close_price
+        description: Candle closing price.
+        tests:
+          - not_null
+
+  - name: stg_binance_price
+    description: Standardized latest market prices extracted from Binance.
+
+    columns:
+
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+
+      - name: price
+        description: Latest observed market price.
+        tests:
+          - not_null
+
+  - name: stg_binance_ticker_24h
+    description: Standardized rolling 24-hour market statistics from Binance.
+
+    columns:
+
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+
+      - name: last_price
+        description: Latest traded price during the rolling 24-hour window.
+        tests:
+          - not_null
+
+      - name: open_time
+        description: Opening timestamp of the rolling 24-hour statistics.
+        tests:
+          - not_null
+
+      - name: close_time
+        description: Closing timestamp of the rolling 24-hour statistics.
+        tests:
+          - not_null

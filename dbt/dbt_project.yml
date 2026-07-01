@@ -1,0 +1,28 @@
+name: "market_data_pipeline"
+version: "1.0.0"
+config-version: 2
+
+profile: "market_data_pipeline"
+
+model-paths:
+  - models
+
+target-path: target
+clean-targets:
+  - target
+  - dbt_packages
+
+models:
+  market_data_pipeline:
+
+    staging:
+      +schema: silver
+      +materialized: view
+
+    silver:
+      +schema: silver
+      +materialized: incremental
+
+    gold:
+      +schema: gold
+      +materialized: table
