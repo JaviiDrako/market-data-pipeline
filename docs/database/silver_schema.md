@@ -167,6 +167,55 @@ This model becomes the canonical candle dataset used by downstream aggregations 
 
 ---
 
+# Multi-Timeframe Aggregations
+
+## Purpose
+
+The multi-timeframe aggregation models build higher timeframe candles from the canonical 1-minute `market_candles`.
+
+Aggregations are performed continuously and incrementally so that consumers (especially the algorithmic trading bot) can query pre-computed candles without on-the-fly calculation.
+
+## Supported Timeframes
+
+- 5 minutes (`market_candles_5m`)
+- 15 minutes (`market_candles_15m`)
+- 30 minutes (`market_candles_30m`)
+- 1 hour (`market_candles_1h`)
+- 1 day (`market_candles_1d`)
+
+## Design Principles
+
+- Time alignment to natural boundaries (e.g. 00:00, 00:05 for 5m).
+- Only complete windows are materialized (no partial candles).
+- Aggregation rules follow standard OHLCV conventions:
+  - Open = first open of the window
+  - High = max high
+  - Low = min low
+  - Close = last close
+  - Volumes = sum
+- Uses dbt incremental + MERGE strategy.
+- Small reprocessing window in incremental logic to handle late-arriving or corrected 1m data.
+- Lightweight candle attributes (body, wicks, range, direction, typical price, ohlc average) are added for reusability.
+
+## Macros
+
+Reusable logic is centralized:
+
+- `aggregate_candles` macro: handles time bucketing and OHLCV aggregation.
+- `candle_attributes` macro: computes objective candle properties.
+
+## Incremental Behavior
+
+- Source data is filtered with a lookback window (3–30 days depending on timeframe).
+- Completeness is enforced by counting source 1m candles per bucket.
+- If a bucket does not have the exact expected number of 1m candles, it is skipped until the data is complete.
+
+## Usage
+
+These models are the primary source for Gold layer indicators and features.
+
+---
+
 ## Materialization
 
 ```
