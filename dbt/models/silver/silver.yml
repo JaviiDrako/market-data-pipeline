@@ -94,7 +94,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['5m']
+              arguments:
+                values: ['5m']
       - name: open_time
         description: Candle opening timestamp (aligned to 5-minute boundaries).
         tests:
@@ -141,7 +142,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['15m']
+              arguments:
+                values: ['15m']
       - name: open_time
         description: Candle opening timestamp (aligned to 15-minute boundaries).
         tests:
@@ -164,7 +166,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['30m']
+              arguments:
+                values: ['30m']
       - name: open_time
         description: Candle opening timestamp (aligned to 30-minute boundaries).
         tests:
@@ -187,7 +190,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['1h']
+              arguments:
+                values: ['1h']
       - name: open_time
         description: Candle opening timestamp (aligned to hourly boundaries).
         tests:
@@ -210,7 +214,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['1d']
+              arguments:
+                values: ['1d']
       - name: open_time
         description: Candle opening timestamp (aligned to daily boundaries).
         tests:
