@@ -7,7 +7,7 @@
 {% endmacro %}
 
 
-{% macro aggregate_ohlcv(source_relation, interval_minutes, interval_label) %}
+{% macro aggregate_ohlcv(source_relation, interval_minutes) %}
     WITH source_data AS (
         SELECT * FROM {{ source_relation }}
     ),
@@ -35,7 +35,6 @@
         SELECT
             exchange,
             symbol,
-            '{{ interval_label }}' AS interval,
             open_time,
             (array_agg(close_time ORDER BY open_time DESC))[1] AS close_time,
             (array_agg(open_price ORDER BY open_time ASC))[1] AS open_price,

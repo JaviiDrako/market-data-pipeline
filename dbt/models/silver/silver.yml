@@ -89,13 +89,6 @@ models:
         description: Trading pair symbol.
         tests:
           - not_null
-      - name: interval
-        description: Candle timeframe.
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['5m']
       - name: open_time
         description: Candle opening timestamp (aligned to 5-minute boundaries).
         tests:
@@ -137,13 +130,6 @@ models:
         description: Trading pair symbol.
         tests:
           - not_null
-      - name: interval
-        description: Candle timeframe.
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['15m']
       - name: open_time
         description: Candle opening timestamp (aligned to 15-minute boundaries).
         tests:
@@ -161,13 +147,6 @@ models:
         description: Trading pair symbol.
         tests:
           - not_null
-      - name: interval
-        description: Candle timeframe.
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['30m']
       - name: open_time
         description: Candle opening timestamp (aligned to 30-minute boundaries).
         tests:
@@ -185,13 +164,6 @@ models:
         description: Trading pair symbol.
         tests:
           - not_null
-      - name: interval
-        description: Candle timeframe.
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['1h']
       - name: open_time
         description: Candle opening timestamp (aligned to hourly boundaries).
         tests:
@@ -209,13 +181,6 @@ models:
         description: Trading pair symbol.
         tests:
           - not_null
-      - name: interval
-        description: Candle timeframe.
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['1d']
       - name: open_time
         description: Candle opening timestamp (aligned to daily boundaries).
         tests:

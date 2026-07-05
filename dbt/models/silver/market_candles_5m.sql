@@ -5,7 +5,6 @@
 ) }}
 
 {% set interval_minutes = 5 %}
-{% set interval_label = '5m' %}
 
 WITH base AS (
     SELECT *
@@ -26,7 +25,7 @@ WITH base AS (
 aggregated AS (
     SELECT *
     FROM (
-        {{ aggregate_ohlcv('base', interval_minutes, interval_label) }}
+        {{ aggregate_ohlcv('base', interval_minutes) }}
     ) agg
     WHERE (
         SELECT COUNT(*)
