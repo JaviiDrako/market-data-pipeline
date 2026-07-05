@@ -1,0 +1,67 @@
+version: 2
+
+models:
+  - name: market_indicators_5m
+    description: Gold layer technical indicators computed on 5-minute Silver candles.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+      - name: ema_9
+      - name: ema_21
+      - name: ema_50
+      - name: ema_200
+      - name: sma_20
+      - name: sma_50
+      - name: sma_200
+      - name: rsi_14
+      - name: macd
+      - name: macd_signal
+      - name: macd_histogram
+      - name: atr_14
+      - name: bb_upper
+      - name: bb_middle
+      - name: bb_lower
+
+  - name: market_indicators_15m
+    description: Gold layer technical indicators computed on 15-minute Silver candles.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_indicators_30m
+    description: Gold layer technical indicators computed on 30-minute Silver candles.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_indicators_1h
+    description: Gold layer technical indicators computed on 1-hour Silver candles.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_indicators_1d
+    description: Gold layer technical indicators computed on daily Silver candles.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
