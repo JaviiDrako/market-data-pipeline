@@ -76,3 +76,142 @@ models:
         description: Latest traded price.
         tests:
           - not_null
+
+  - name: market_candles_5m
+    description: 5-minute aggregated candlestick data derived from 1-minute canonical candles. Only complete windows are materialized.
+
+    columns:
+      - name: exchange
+        description: Exchange that produced the candlestick.
+        tests:
+          - not_null
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+      - name: interval
+        description: Candle timeframe.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['5m']
+      - name: open_time
+        description: Candle opening timestamp (aligned to 5-minute boundaries).
+        tests:
+          - not_null
+      - name: close_time
+        description: Candle closing timestamp.
+        tests:
+          - not_null
+      - name: open_price
+        description: Opening price of the 5m period.
+        tests:
+          - not_null
+      - name: high_price
+        description: Highest price during the 5m period.
+        tests:
+          - not_null
+      - name: low_price
+        description: Lowest price during the 5m period.
+        tests:
+          - not_null
+      - name: close_price
+        description: Closing price of the 5m period.
+        tests:
+          - not_null
+      - name: candle_direction
+        description: Direction of the candle (1 = bullish, -1 = bearish, 0 = doji).
+      - name: body_size
+        description: Absolute size of the candle body.
+
+  - name: market_candles_15m
+    description: 15-minute aggregated candlestick data derived from 1-minute canonical candles. Only complete windows are materialized.
+
+    columns:
+      - name: exchange
+        description: Exchange that produced the candlestick.
+        tests:
+          - not_null
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+      - name: interval
+        description: Candle timeframe.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['15m']
+      - name: open_time
+        description: Candle opening timestamp (aligned to 15-minute boundaries).
+        tests:
+          - not_null
+
+  - name: market_candles_30m
+    description: 30-minute aggregated candlestick data derived from 1-minute canonical candles. Only complete windows are materialized.
+
+    columns:
+      - name: exchange
+        description: Exchange that produced the candlestick.
+        tests:
+          - not_null
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+      - name: interval
+        description: Candle timeframe.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['30m']
+      - name: open_time
+        description: Candle opening timestamp (aligned to 30-minute boundaries).
+        tests:
+          - not_null
+
+  - name: market_candles_1h
+    description: 1-hour aggregated candlestick data derived from 1-minute canonical candles. Only complete windows are materialized.
+
+    columns:
+      - name: exchange
+        description: Exchange that produced the candlestick.
+        tests:
+          - not_null
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+      - name: interval
+        description: Candle timeframe.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['1h']
+      - name: open_time
+        description: Candle opening timestamp (aligned to hourly boundaries).
+        tests:
+          - not_null
+
+  - name: market_candles_1d
+    description: Daily aggregated candlestick data derived from 1-minute canonical candles. Only complete windows are materialized.
+
+    columns:
+      - name: exchange
+        description: Exchange that produced the candlestick.
+        tests:
+          - not_null
+      - name: symbol
+        description: Trading pair symbol.
+        tests:
+          - not_null
+      - name: interval
+        description: Candle timeframe.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['1d']
+      - name: open_time
+        description: Candle opening timestamp (aligned to daily boundaries).
+        tests:
+          - not_null
