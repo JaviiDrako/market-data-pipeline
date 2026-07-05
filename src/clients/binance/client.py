@@ -3,6 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 import requests
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 
 from src.clients.binance.settings import (
     API_VERSION,
@@ -17,6 +23,13 @@ from src.clients.market_data_client import MarketDataClient
 
 class BinanceClientError(Exception):
     """Raised when the Binance API request fails."""
+
+
+TRANSIENT_EXCEPTIONS = (
+    requests.exceptions.Timeout,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.ChunkedEncodingError,
+)
 
 
 class BinanceClient(MarketDataClient):
@@ -58,6 +71,12 @@ class BinanceClient(MarketDataClient):
         """Fetches the 24-hour ticker for a symbol from Binance."""
         return self._get(TICKER_24H_ENDPOINT, {"symbol": symbol})
 
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential_jitter(initial=1, max=30),
+        retry=retry_if_exception_type(TRANSIENT_EXCEPTIONS + (requests.exceptions.HTTPError,)),
+        reraise=True,
+    )
     def _get(self, endpoint: str, params: dict[str, Any]) -> Any:
         url = f"{BASE_URL}{API_VERSION}{endpoint}"
 
@@ -65,10 +84,13 @@ class BinanceClient(MarketDataClient):
             response = requests.get(url, params=params, timeout=self._timeout)
             response.raise_for_status()
         except requests.HTTPError as exc:
+            # Only retry on 5xx and 429 (rate limit)
+            if response.status_code >= 500 or response.status_code == 429:
+                raise
             message = self._build_http_error_message(response)
             raise BinanceClientError(message) from exc
-        except requests.RequestException as exc:
-            raise BinanceClientError(f"Binance API request failed: {exc}") from exc
+        except TRANSIENT_EXCEPTIONS as exc:
+            raise
 
         try:
             return response.json()
