@@ -84,10 +84,11 @@ class BinanceClient(MarketDataClient):
             response = requests.get(url, params=params, timeout=self._timeout)
             response.raise_for_status()
         except requests.HTTPError as exc:
+            status = getattr(exc.response, 'status_code', 0)
             # Only retry on 5xx and 429 (rate limit)
-            if response.status_code >= 500 or response.status_code == 429:
+            if status >= 500 or status == 429:
                 raise
-            message = self._build_http_error_message(response)
+            message = self._build_http_error_message(exc.response)
             raise BinanceClientError(message) from exc
         except TRANSIENT_EXCEPTIONS as exc:
             raise
