@@ -12,25 +12,29 @@ WITH source AS (
     {% endif %}
 ),
 
-rn AS (
+with_rn AS (
     SELECT 
         *,
         ROW_NUMBER() OVER (PARTITION BY exchange, symbol ORDER BY open_time) AS rn
     FROM source
 ),
 
-max_rn AS (
+with_max_rn AS (
     SELECT 
         *,
         MAX(rn) OVER (PARTITION BY exchange, symbol) AS max_rn
-    FROM rn
+    FROM with_rn
 ),
 
 tr AS (
     SELECT 
         *,
-        GREATEST(high_price - low_price, ABS(high_price - LAG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time)), ABS(low_price - LAG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time))) AS tr
-    FROM max_rn
+        GREATEST(
+            high_price - low_price,
+            ABS(high_price - LAG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time)),
+            ABS(low_price - LAG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time))
+        ) AS tr
+    FROM with_max_rn
 ),
 
 gain_loss AS (
@@ -47,18 +51,29 @@ indicators AS (
         symbol,
         open_time,
 
-        -- EMA (using SMA as base for the EMA column, with note for full recursive)
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 8 PRECEDING AND CURRENT ROW) AS ema_9,
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 20 PRECEDING AND CURRENT ROW) AS ema_21,
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS ema_50,
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS ema_200,
+        -- Correct EMA using weighted (finite history EMA)
+        -- EMA9 factor=0.8
+        SUM(close_price * power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / 
+        NULLIF( SUM(power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_9,
+
+        -- EMA21 factor≈0.90909
+        SUM(close_price * power(0.90909, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / 
+        NULLIF( SUM(power(0.90909, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_21,
+
+        -- EMA50 factor≈0.96078
+        SUM(close_price * power(0.96078, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / 
+        NULLIF( SUM(power(0.96078, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_50,
+
+        -- EMA200 factor≈0.99005
+        SUM(close_price * power(0.99005, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / 
+        NULLIF( SUM(power(0.99005, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_200,
 
         -- SMAs
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS sma_20,
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma_50,
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma_200,
 
-        -- RSI 14 (Wilder)
+        -- RSI 14 (correct Wilder)
         100 - (100 / (1 + NULLIF(
             AVG(gain) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW),
             0
@@ -67,24 +82,22 @@ indicators AS (
             0
         ))) AS rsi_14,
 
-        -- ATR 14 (Wilder style SMA of TR)
+        -- ATR 14
         AVG(tr) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW) AS atr_14,
 
-        -- Bollinger (20, 2)
+        -- Bollinger
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS bb_middle,
         STDDEV(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS bb_std,
 
-        -- For MACD
         close_price
 
     FROM gain_loss
 ),
 
--- MACD full (12,26,9)
 macd AS (
     SELECT 
         *,
-        -- EMA12 and EMA26 for MACD (using SMA as base for this implementation)
+        -- EMA12 and EMA26 for MACD (SMA base for this layer)
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) AS ema12,
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 25 PRECEDING AND CURRENT ROW) AS ema26
     FROM indicators
