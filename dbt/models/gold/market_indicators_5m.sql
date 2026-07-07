@@ -8,24 +8,29 @@ WITH source AS (
     SELECT *
     FROM {{ ref('market_candles_5m') }}
     {% if is_incremental() %}
-        WHERE open_time >= (SELECT COALESCE(MAX(open_time) - INTERVAL '30 days', TIMESTAMP '1970-01-01') FROM {{ this }})
+        WHERE open_time >= (
+            SELECT COALESCE(MAX(open_time) - INTERVAL '30 days', TIMESTAMP '1970-01-01')
+            FROM {{ this }}
+        )
     {% endif %}
 ),
 
-with_rn AS (
+-- Row number and max_rn for weighting
+rn AS (
     SELECT 
         *,
         ROW_NUMBER() OVER (PARTITION BY exchange, symbol ORDER BY open_time) AS rn
     FROM source
 ),
 
-with_max_rn AS (
+max_rn AS (
     SELECT 
         *,
         MAX(rn) OVER (PARTITION BY exchange, symbol) AS max_rn
-    FROM with_rn
+    FROM rn
 ),
 
+-- True Range
 tr AS (
     SELECT 
         *,
@@ -34,9 +39,10 @@ tr AS (
             ABS(high_price - LAG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time)),
             ABS(low_price - LAG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time))
         ) AS tr
-    FROM with_max_rn
+    FROM max_rn
 ),
 
+-- Gain/Loss for RSI
 gain_loss AS (
     SELECT 
         *,
@@ -45,27 +51,27 @@ gain_loss AS (
     FROM tr
 ),
 
+-- Indicators with correct EMA using weighted average for the window (correct finite EMA)
 indicators AS (
     SELECT
         exchange,
         symbol,
         open_time,
 
-        -- Correct EMA using weighted (finite history EMA)
-        -- EMA9 factor=0.8
-        SUM(close_price * power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / 
+        -- EMA9 (k=0.2, factor=0.8)
+        SUM(close_price * power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
         NULLIF( SUM(power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_9,
 
-        -- EMA21 factor≈0.90909
-        SUM(close_price * power(0.90909, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / 
+        -- EMA21 (factor=0.90909)
+        SUM(close_price * power(0.90909, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
         NULLIF( SUM(power(0.90909, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_21,
 
-        -- EMA50 factor≈0.96078
-        SUM(close_price * power(0.96078, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / 
+        -- EMA50 (factor=0.96078)
+        SUM(close_price * power(0.96078, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
         NULLIF( SUM(power(0.96078, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_50,
 
-        -- EMA200 factor≈0.99005
-        SUM(close_price * power(0.99005, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) / 
+        -- EMA200 (factor=0.99005)
+        SUM(close_price * power(0.99005, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
         NULLIF( SUM(power(0.99005, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_200,
 
         -- SMAs
@@ -73,7 +79,7 @@ indicators AS (
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma_50,
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma_200,
 
-        -- RSI 14 (correct Wilder)
+        -- RSI 14 (Wilder)
         100 - (100 / (1 + NULLIF(
             AVG(gain) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW),
             0
@@ -89,17 +95,23 @@ indicators AS (
         AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS bb_middle,
         STDDEV(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS bb_std,
 
-        close_price
+        close_price,
+        rn,
+        max_rn
 
     FROM gain_loss
 ),
 
+-- MACD
 macd AS (
     SELECT 
         *,
-        -- EMA12 and EMA26 for MACD (SMA base for this layer)
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) AS ema12,
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 25 PRECEDING AND CURRENT ROW) AS ema26
+        -- EMA12
+        SUM(close_price * power(0.84615, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
+        NULLIF(SUM(power(0.84615, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema12,
+        -- EMA26
+        SUM(close_price * power(0.92593, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
+        NULLIF(SUM(power(0.92593, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema26
     FROM indicators
 )
 
@@ -120,16 +132,17 @@ SELECT
     rsi_14,
 
     (ema12 - ema26) AS macd,
-    NULL::numeric AS macd_signal,
-    NULL::numeric AS macd_histogram,
+    (ema12 - ema26) * (2.0/10) + COALESCE(
+        LAG(ema12 - ema26) OVER (PARTITION BY exchange, symbol ORDER BY open_time) * (1-2.0/10),
+        (ema12 - ema26)
+    ) AS macd_signal,
+    (ema12 - ema26) - ( (ema12 - ema26) * (2.0/10) + COALESCE(LAG(ema12 - ema26) OVER (PARTITION BY exchange, symbol ORDER BY open_time) * (1-2.0/10), (ema12 - ema26)) ) AS macd_histogram,
 
     atr_14,
 
     bb_middle,
     bb_middle + 2 * bb_std AS bb_upper,
-    bb_middle - 2 * bb_std AS bb_lower,
-
-    NULL::numeric AS adx_14
+    bb_middle - 2 * bb_std AS bb_lower
 
 FROM macd
 

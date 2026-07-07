@@ -30,13 +30,12 @@ Primary key: (exchange, symbol, open_time)
 
 ## Indicators Implemented
 
-- EMA (9, 21, 50, 200)
+- EMA (9, 21, 50, 200) - using weighted exponential smoothing (finite history EMA)
 - SMA (20, 50, 200)
-- RSI (14)
-- MACD (macd, signal, histogram) - base implementation
-- ATR (14)
-- Bollinger Bands (middle, upper, lower)
-- ADX (14) - placeholder
+- RSI (14) - Wilder implementation
+- MACD (macd, signal, histogram) - full standard implementation
+- ATR (14) - with True Range
+- Bollinger Bands (upper, middle, lower)
 
 ## Macros
 
@@ -48,7 +47,8 @@ Located in `dbt/macros/gold/indicators/`:
 - atr.sql
 - bollinger.sql
 - macd.sql
-- adx.sql
+
+(Note: ADX was removed as it was not implemented to avoid placeholders.)
 
 ## Incremental Strategy
 
