@@ -316,7 +316,7 @@ Implemented
 - Source Definitions
 - Staging Views
 - Incremental Silver Models
-- Integration Test
+- End-to-End Pipeline Test (integration)
 - Schema Generation Macro
 
 Pending
