@@ -98,7 +98,7 @@ print("=" * 80)
 pipeline = BronzePipeline()
 dag_run_id = "integration_test_" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
 rows_inserted = pipeline.run(dag_run_id)
-print(f"Rows inserted into Bronze: {rows_inserted}")
+print(f"Rows inserted into Bronze (dag_run_id={dag_run_id}): {rows_inserted}")
 
 print()
 
@@ -107,11 +107,15 @@ seed_test_klines()
 # dbt compile
 run_dbt_step(["compile"], "RUNNING DBT COMPILE")
 
-# dbt run silver + gold (using +gold to include all upstream dependencies: staging -> silver -> gold)
-run_dbt_step(["run", "--select", "+gold"], "RUNNING DBT SILVER + GOLD")
+# dbt run for candle/gold path ( +gold ensures all upstream including staging)
+run_dbt_step(["run", "--select", "+gold"], "RUNNING DBT SILVER + GOLD (candle path)")
 
-# dbt test silver + gold
-run_dbt_step(["test", "--select", "+gold"], "RUNNING DBT TESTS")
+# snapshot with full-refresh to avoid "MERGE affects row a second time" with test data
+run_dbt_step(["run", "--select", "market_snapshot", "--full-refresh"], "RUNNING DBT SNAPSHOT")
+
+# dbt test 
+run_dbt_step(["test", "--select", "+gold"], "RUNNING DBT TESTS (gold path)")
+run_dbt_step(["test", "--select", "market_snapshot"], "RUNNING DBT TESTS (snapshot)")
 
 print("=" * 80)
 print("VERIFYING BRONZE")
