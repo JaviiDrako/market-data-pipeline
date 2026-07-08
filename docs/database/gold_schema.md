@@ -1,25 +1,27 @@
-# Gold Layer - Technical Indicators and Trading Features
+# Gold Layer - Technical Indicators, Trading Features, Signals and Feature Tables
 
 ## Purpose
 
-The Gold layer computes and persists technical indicators and trading features on top of the Silver aggregated candles.
+The Gold layer computes and persists technical indicators, trading features, signals, and final consolidated datasets (Feature Tables) on top of the Silver aggregated candles.
 
-Gold is optimized for consumption by the algorithmic trading bot and downstream Feature Tables / Signals.
+Gold is optimized for consumption by the algorithmic trading bot, backtesting engines, machine learning models, and future dashboards / analysis. The final output is the **Feature Tables** layer.
 
 ## Architecture
 
 The full Gold architecture follows the medallion refinement:
 
 ```
+Bronze
+  ↓
 Silver (market_candles_*)
-    ↓
+  ↓
 Gold Indicators (market_indicators_*)
-    ↓
+  ↓
 Gold Features (market_features_*)
-    ↓
+  ↓
 Gold Signals (market_signals_*)
-    ↓
-Feature Tables (future)
+  ↓
+Gold Feature Tables (market_dataset_*)
 ```
 
 Gold **Indicators** read exclusively from Silver.
@@ -27,6 +29,8 @@ Gold **Indicators** read exclusively from Silver.
 Gold **Features** consume **exclusively** existing Gold Indicator tables (joined with Silver Candles only when necessary for price-action calculations). Features never recalculate indicators, never read from Bronze/Staging, and never duplicate OHLCV or indicator values.
 
 Gold **Signals** consume **exclusively** Gold Features + Gold Indicators. Signals are generic boolean/integer flags (not final trade decisions). They provide structured context for the trading bot or ML models. Signals never recalculate anything from lower layers.
+
+Gold **Feature Tables** are the final consolidated layer. They consume exclusively the three previous Gold layers (Indicators + Features + Signals) and produce clean, ready-to-consume datasets containing only keys + features + signals. No recalculation occurs at this layer.
 ```
 
 ## Models
@@ -73,6 +77,25 @@ Materialization: incremental + MERGE
 Primary key: (exchange, symbol, open_time)
 
 No ephemeral category models are persisted for signals (logic lives purely in macros + orchestration models).
+
+### Feature Tables
+- market_dataset_5m
+- market_dataset_15m
+- market_dataset_30m
+- market_dataset_1h
+- market_dataset_1d
+
+These are the final persisted datasets.
+
+Materialization: incremental + MERGE
+
+Primary key: (exchange, symbol, open_time)
+
+Each row = exactly one candle timeframe bar.
+
+Contain: keys + **all** Features + **all** Signals.
+
+Do not contain any OHLC/OHLCV or raw indicator values.
 
 ## Indicators Implemented
 
@@ -132,6 +155,27 @@ All signals are derived **only** from existing Gold Features and Gold Indicators
 - new_20_high, new_20_low, new_50_high, new_50_low (based on distance_to_* <= 0.05)
 - breakout_confirmation (new high + momentum/alignment confirmation)
 
+## Feature Tables
+
+The Feature Tables (`market_dataset_*`) are the **final output layer** of the Gold medallion.
+
+Purpose:
+- Provide a single, clean, denormalized table per timeframe ready for:
+  - Algorithmic trading bot (live inference)
+  - Backtesting engines
+  - Machine Learning feature stores / training datasets
+  - Exploratory data analysis
+  - Future BI dashboards
+
+Each table contains:
+- Natural key (exchange, symbol, open_time)
+- Every trading Feature previously computed
+- Every Signal previously computed
+
+No raw price data, no indicators, no duplication.
+
+Models are intentionally trivial (pure joins + projection) so that all business logic remains in the lower reusable layers.
+
 ## Implementation
 
 Gold **indicator** models act as orchestration layers:
@@ -154,6 +198,13 @@ Gold **signal** models follow exactly the same layered reusable macro approach:
 - Signals always use BOOLEAN (or SMALLINT/INTEGER when appropriate). Never store raw values.
 - A single implementation per signal. No recalc of features or indicators. No direct access to candles or lower layers.
 
+Gold **feature table** models are the simplest layer:
+- `market_dataset_*` are pure consolidation models.
+- They perform only joins between the three upstream Gold models for the same timeframe (indicators + features + signals).
+- They project exactly the keys + all feature columns + all signal columns.
+- Zero calculations, zero CASE statements, zero new logic.
+- Their only job is to produce the final clean dataset for consumers.
+
 ## Adding New Features in the Future
 
 1. Add a new macro (or extend existing category macro file) in `dbt/macros/gold/features/`.
@@ -175,6 +226,21 @@ This guarantees one source of truth and consistency across all timeframes.
 
 Signals must derive exclusively from already-computed Features and Indicators.
 
+## Adding New Columns to Feature Tables in the Future
+
+Since Feature Tables are pure projections:
+
+1. Add the new column to the appropriate lower layer first:
+   - New indicator → indicators macro + model
+   - New feature → features macro + category + market_features model
+   - New signal → signals macro + market_signals model
+2. Add the new column to the corresponding `market_dataset_<tf>.sql` SELECT (from the source CTE that provides it).
+3. Add the column (with description and tests) to the model entry in `dbt/models/gold/gold.yml`.
+4. Update the Feature Tables section in this document.
+5. Run small commit + `dbt compile && dbt run --select gold && dbt test --select gold`.
+
+The Feature Table models should remain trivial. All intelligence stays in Indicators / Features / Signals.
+
 ## Incremental Strategy
 
 Similar to Silver and Indicators: reprocessing window (tf-dependent: 30d for 5m ... 400d for 1d) to allow recalculation when new or corrected data arrives.
@@ -182,13 +248,30 @@ Similar to Silver and Indicators: reprocessing window (tf-dependent: 30d for 5m 
 ## Testing
 
 - not_null tests on keys (exchange, symbol, open_time) for all models.
-- Basic coverage for feature models in gold.yml.
+- Basic coverage for feature models, signal models and feature table models in gold.yml.
 - Full validation via `dbt test --select gold`.
 
 ## Data Flow
 
-Silver aggregated candles → Gold Indicators (no OHLCV dup)
+```
+Bronze (raw klines, prices, snapshots)
+  ↓
+Silver (normalized + aggregated candles per timeframe)
+  ↓
+Gold Indicators (market_indicators_*)
+  ↓
+Gold Features (market_features_*)
+  ↓
+Gold Signals (market_signals_*)
+  ↓
+Gold Feature Tables (market_dataset_*)   ← final consumable datasets
+```
 
-Gold Indicators (+ Silver Candles where strictly needed) → Gold Features (only feature columns persisted)
+- Silver aggregated candles → Gold Indicators
+- Gold Indicators + Silver candles (only when needed) → Gold Features
+- Gold Features + Gold Indicators → Gold Signals
+- Gold Indicators + Gold Features + Gold Signals → Gold Feature Tables (only features + signals persisted)
 
-Consumers (Signals / Feature Tables / trading bot) read from Gold Features (and Indicators when raw values needed) joined with Silver when full context required.
+Final consumers (trading bot, backtesting, ML, dashboards) should read primarily from the `market_dataset_*` tables. When raw indicator values are needed, join with the corresponding `market_indicators_*` or `market_features_*`.
+
+No layer ever reads Bronze or Staging directly (except the first Gold layer).
