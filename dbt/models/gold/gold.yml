@@ -65,3 +65,106 @@ models:
         tests: [not_null]
       - name: open_time
         tests: [not_null]
+
+  # Gold Features - Trading Features layer (consumes Indicators + Candles)
+  - name: market_features_5m
+    description: |
+      Gold Features for 5-minute timeframe.
+      Derived exclusively from market_indicators_5m and market_candles_5m.
+      Contains only computed trading features + natural key. No OHLCV or raw indicator duplication.
+    columns:
+      - name: exchange
+        description: Exchange identifier.
+        tests: [not_null]
+      - name: symbol
+        description: Trading pair symbol.
+        tests: [not_null]
+      - name: open_time
+        description: Candle open timestamp.
+        tests: [not_null]
+      - name: ema9_distance_pct
+      - name: ema_alignment
+      - name: rsi_normalized
+      - name: atr_pct
+      - name: candle_body_ratio
+
+  - name: market_features_15m
+    description: Gold Features for 15-minute timeframe. Derived from indicators and candles only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_features_30m
+    description: Gold Features for 30-minute timeframe. Derived from indicators and candles only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_features_1h
+    description: Gold Features for 1-hour timeframe. Derived from indicators and candles only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_features_1d
+    description: Gold Features for daily timeframe. Derived from indicators and candles only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  # Ephemeral feature category implementations (reusable logic references)
+  - name: trend_features
+    description: Ephemeral model grouping all trend-based trading features (EMA distances, alignment, slopes, price vs ema).
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: momentum_features
+    description: Ephemeral model grouping momentum trading features (normalized RSI, MACD strength, price changes).
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: volatility_features
+    description: Ephemeral model grouping volatility trading features (ATR pct, rolling std, Bollinger metrics).
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: price_action_features
+    description: Ephemeral model grouping price action trading features (candle ratios, distance to recent highs/lows).
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
