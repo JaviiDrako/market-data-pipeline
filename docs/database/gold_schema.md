@@ -17,7 +17,7 @@ Gold Indicators (market_indicators_*)
     ↓
 Gold Features (market_features_*)
     ↓
-Gold Signals (future)
+Gold Signals (market_signals_*)
     ↓
 Feature Tables (future)
 ```
@@ -25,6 +25,8 @@ Feature Tables (future)
 Gold **Indicators** read exclusively from Silver.
 
 Gold **Features** consume **exclusively** existing Gold Indicator tables (joined with Silver Candles only when necessary for price-action calculations). Features never recalculate indicators, never read from Bronze/Staging, and never duplicate OHLCV or indicator values.
+
+Gold **Signals** consume **exclusively** Gold Features + Gold Indicators. Signals are generic boolean/integer flags (not final trade decisions). They provide structured context for the trading bot or ML models. Signals never recalculate anything from lower layers.
 ```
 
 ## Models
@@ -58,6 +60,19 @@ The category `*_features` (ephemeral) provide reusable grouped implementations.
 Materialization (features): market_features_* = incremental + MERGE; categories = ephemeral
 
 Primary key: (exchange, symbol, open_time)
+
+### Signals
+- market_signals_5m
+- market_signals_15m
+- market_signals_30m
+- market_signals_1h
+- market_signals_1d
+
+Materialization: incremental + MERGE
+
+Primary key: (exchange, symbol, open_time)
+
+No ephemeral category models are persisted for signals (logic lives purely in macros + orchestration models).
 
 ## Indicators Implemented
 
@@ -93,6 +108,30 @@ Primary key: (exchange, symbol, open_time)
 - distance_to_20_high, distance_to_20_low
 - distance_to_50_high, distance_to_50_low
 
+## Signals Implemented
+
+All signals are derived **only** from existing Gold Features and Gold Indicators. No recalculation.
+
+### Trend Signals
+- ema_bullish_alignment, ema_bearish_alignment
+- price_above_ema50, price_above_ema200
+- golden_cross, death_cross
+
+### Momentum Signals
+- rsi_overbought (rsi_14 >= 70), rsi_oversold (rsi_14 <= 30)
+- rsi_recovering
+- macd_bullish_cross, macd_bearish_cross
+- macd_positive
+
+### Volatility Signals
+- high_volatility (atr_pct or bollinger_width thresholds)
+- low_volatility
+- bollinger_breakout_up (position > 1), bollinger_breakout_down (position < 0)
+
+### Breakout Signals
+- new_20_high, new_20_low, new_50_high, new_50_low (based on distance_to_* <= 0.05)
+- breakout_confirmation (new high + momentum/alignment confirmation)
+
 ## Implementation
 
 Gold **indicator** models act as orchestration layers:
@@ -109,6 +148,12 @@ Gold **feature** models follow the same philosophy:
 - Category models (`trend_features.sql` etc) under `dbt/models/gold/features/` serve as reusable implementations (ephemeral) and grouping.
 - A single implementation per feature. No recalc of indicators. No direct Bronze reads.
 
+Gold **signal** models follow exactly the same layered reusable macro approach:
+- `market_signals_*` are thin orchestrators: join the corresponding `market_features_*` + `market_indicators_*`, prepare source with required columns, compute category CTEs using macros, join for final column union.
+- All signal logic lives in single implementation inside `dbt/macros/gold/signals/` (trend_signals.sql, momentum_signals.sql, volatility_signals.sql, breakout_signals.sql).
+- Signals always use BOOLEAN (or SMALLINT/INTEGER when appropriate). Never store raw values.
+- A single implementation per signal. No recalc of features or indicators. No direct access to candles or lower layers.
+
 ## Adding New Features in the Future
 
 1. Add a new macro (or extend existing category macro file) in `dbt/macros/gold/features/`.
@@ -119,6 +164,16 @@ Gold **feature** models follow the same philosophy:
 6. Add small commit, run `dbt compile && dbt run --select gold && dbt test --select gold`.
 
 This guarantees one source of truth and consistency across all timeframes.
+
+## Adding New Signals in the Future
+
+1. Add or extend a macro in `dbt/macros/gold/signals/<category>_signals.sql` (single implementation).
+2. Add the signal computation (via macro) inside each of the 5 `market_signals_*` models (in the proper category CTE in the source join).
+3. Add column entry (with description and not_null where appropriate) in `dbt/models/gold/gold.yml`.
+4. Document under the relevant category in this file.
+5. Small commit + full validation: `dbt compile && dbt run --select gold && dbt test --select gold`.
+
+Signals must derive exclusively from already-computed Features and Indicators.
 
 ## Incremental Strategy
 
