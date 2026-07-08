@@ -168,3 +168,83 @@ models:
         tests: [not_null]
       - name: open_time
         tests: [not_null]
+
+  # Gold Signals - Generic trading signals derived from Features + Indicators
+  - name: market_signals_5m
+    description: |
+      Gold Signals for 5-minute timeframe.
+      Derived exclusively from market_features_5m and market_indicators_5m.
+      Boolean/integer signals only. No OHLCV, indicators or features stored.
+    columns:
+      - name: exchange
+        description: Exchange identifier.
+        tests: [not_null]
+      - name: symbol
+        description: Trading pair symbol.
+        tests: [not_null]
+      - name: open_time
+        description: Candle open timestamp.
+        tests: [not_null]
+      - name: ema_bullish_alignment
+        description: Strict bullish EMA alignment (9>21>50>200).
+        tests: [not_null]
+      - name: ema_bearish_alignment
+      - name: price_above_ema50
+      - name: price_above_ema200
+      - name: golden_cross
+      - name: death_cross
+      - name: rsi_overbought
+      - name: rsi_oversold
+      - name: rsi_recovering
+      - name: macd_bullish_cross
+      - name: macd_bearish_cross
+      - name: macd_positive
+      - name: high_volatility
+      - name: low_volatility
+      - name: bollinger_breakout_up
+      - name: bollinger_breakout_down
+      - name: new_20_high
+      - name: new_20_low
+      - name: new_50_high
+      - name: new_50_low
+      - name: breakout_confirmation
+
+  - name: market_signals_15m
+    description: Gold Signals for 15-minute timeframe. Derived from features and indicators only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_signals_30m
+    description: Gold Signals for 30-minute timeframe. Derived from features and indicators only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_signals_1h
+    description: Gold Signals for 1-hour timeframe. Derived from features and indicators only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_signals_1d
+    description: Gold Signals for daily timeframe. Derived from features and indicators only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
