@@ -15,7 +15,7 @@ WITH source AS (
     {% endif %}
 ),
 
--- Row number and max_rn for weighting
+-- Row number and max_rn for weighting (common for EMAs and MACD signal)
 rn AS (
     SELECT 
         *,
@@ -30,7 +30,7 @@ max_rn AS (
     FROM rn
 ),
 
--- True Range
+-- True Range (common for ATR)
 tr AS (
     SELECT 
         *,
@@ -42,7 +42,7 @@ tr AS (
     FROM max_rn
 ),
 
--- Gain/Loss for RSI
+-- Gain/Loss for RSI (common)
 gain_loss AS (
     SELECT 
         *,
@@ -51,49 +51,28 @@ gain_loss AS (
     FROM tr
 ),
 
--- Indicators with correct EMA using weighted average for the window (correct finite EMA)
+-- Indicators (orchestration - call macros)
 indicators AS (
     SELECT
         exchange,
         symbol,
         open_time,
 
-        -- EMA9 (k=0.2, factor=0.8)
-        SUM(close_price * power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
-        NULLIF( SUM(power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_9,
+        {{ ema('close_price', 9) }} AS ema_9,
+        {{ ema('close_price', 21) }} AS ema_21,
+        {{ ema('close_price', 50) }} AS ema_50,
+        {{ ema('close_price', 200) }} AS ema_200,
 
-        -- EMA21 (factor=0.90909)
-        SUM(close_price * power(0.90909, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
-        NULLIF( SUM(power(0.90909, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_21,
+        {{ sma('close_price', 20) }} AS sma_20,
+        {{ sma('close_price', 50) }} AS sma_50,
+        {{ sma('close_price', 200) }} AS sma_200,
 
-        -- EMA50 (factor=0.96078)
-        SUM(close_price * power(0.96078, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
-        NULLIF( SUM(power(0.96078, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_50,
+        {{ rsi(14) }} AS rsi_14,
 
-        -- EMA200 (factor=0.99005)
-        SUM(close_price * power(0.99005, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
-        NULLIF( SUM(power(0.99005, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema_200,
+        {{ atr(14) }} AS atr_14,
 
-        -- SMAs
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS sma_20,
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS sma_50,
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) AS sma_200,
-
-        -- RSI 14 (Wilder)
-        100 - (100 / (1 + NULLIF(
-            AVG(gain) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW),
-            0
-        ) / NULLIF(
-            AVG(loss) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW),
-            0
-        ))) AS rsi_14,
-
-        -- ATR 14
-        AVG(tr) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 13 PRECEDING AND CURRENT ROW) AS atr_14,
-
-        -- Bollinger
-        AVG(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS bb_middle,
-        STDDEV(close_price) OVER (PARTITION BY exchange, symbol ORDER BY open_time ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS bb_std,
+        {{ bollinger_middle(20) }} AS bb_middle,
+        {{ bollinger_std(20) }} AS bb_std,
 
         close_price,
         rn,
@@ -102,16 +81,12 @@ indicators AS (
     FROM gain_loss
 ),
 
--- MACD
-macd AS (
+-- MACD base (reuses ema macro for ema12 and ema26)
+macd_base AS (
     SELECT 
         *,
-        -- EMA12
-        SUM(close_price * power(0.84615, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
-        NULLIF(SUM(power(0.84615, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema12,
-        -- EMA26
-        SUM(close_price * power(0.92593, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
-        NULLIF(SUM(power(0.92593, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS ema26
+        {{ ema('close_price', 12) }} AS ema12,
+        {{ ema('close_price', 26) }} AS ema26
     FROM indicators
 )
 
@@ -132,21 +107,20 @@ SELECT
     rsi_14,
 
     (ema12 - ema26) AS macd,
-    SUM((ema12 - ema26) * power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
-    NULLIF( SUM(power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0 ) AS macd_signal,
-    (ema12 - ema26) - (
-      SUM((ema12 - ema26) * power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
-      NULLIF( SUM(power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0 )
-    ) AS macd_histogram,
+    {{ macd_signal(9) }} AS macd_signal,
+    (ema12 - ema26) - {{ macd_signal(9) }} AS macd_histogram,
 
     atr_14,
 
     bb_middle,
-    bb_middle + 2 * bb_std AS bb_upper,
-    bb_middle - 2 * bb_std AS bb_lower
+    bb_middle + 2 * {{ bollinger_std(20) }} AS bb_upper,
+    bb_middle - 2 * {{ bollinger_std(20) }} AS bb_lower
 
-FROM macd
+FROM macd_base
 
 {% if is_incremental() %}
-WHERE open_time > (SELECT COALESCE(MAX(open_time), TIMESTAMP '1970-01-01') FROM {{ this }})
+WHERE open_time > (
+    SELECT COALESCE(MAX(open_time), TIMESTAMP '1970-01-01')
+    FROM {{ this }}
+)
 {% endif %}

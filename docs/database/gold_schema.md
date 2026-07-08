@@ -39,9 +39,17 @@ Primary key: (exchange, symbol, open_time)
 
 ## Implementation
 
-All calculations are implemented directly inside the Gold dbt models (single source of truth).
+Gold models act as orchestration layers:
+- They read from the corresponding Silver timeframe model.
+- They prepare common CTEs (row numbering, True Range, gain/loss for RSI, etc.).
+- They call reusable dbt macros for each indicator calculation.
 
-Obsolete indicator macros were removed.
+Indicator implementations live in `dbt/macros/gold/indicators/`:
+- ema.sql, sma.sql, rsi.sql, atr.sql, bollinger.sql, macd.sql
+
+Each indicator has exactly one implementation. New indicators can be added by creating a new macro and calling it from the Gold models.
+
+This ensures maintainability and avoids duplication across timeframes.
 
 ADX was removed entirely (no placeholders).
 
