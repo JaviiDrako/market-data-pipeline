@@ -132,11 +132,12 @@ SELECT
     rsi_14,
 
     (ema12 - ema26) AS macd,
-    (ema12 - ema26) * (2.0/10) + COALESCE(
-        LAG(ema12 - ema26) OVER (PARTITION BY exchange, symbol ORDER BY open_time) * (1-2.0/10),
-        (ema12 - ema26)
-    ) AS macd_signal,
-    (ema12 - ema26) - ( (ema12 - ema26) * (2.0/10) + COALESCE(LAG(ema12 - ema26) OVER (PARTITION BY exchange, symbol ORDER BY open_time) * (1-2.0/10), (ema12 - ema26)) ) AS macd_histogram,
+    SUM((ema12 - ema26) * power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
+    NULLIF( SUM(power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0 ) AS macd_signal,
+    (ema12 - ema26) - (
+      SUM((ema12 - ema26) * power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) /
+      NULLIF( SUM(power(0.8, max_rn - rn)) OVER (PARTITION BY exchange, symbol ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0 )
+    ) AS macd_histogram,
 
     atr_14,
 

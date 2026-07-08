@@ -37,18 +37,13 @@ Primary key: (exchange, symbol, open_time)
 - ATR (14) - with True Range
 - Bollinger Bands (upper, middle, lower)
 
-## Macros
+## Implementation
 
-Located in `dbt/macros/gold/indicators/`:
+All calculations are implemented directly inside the Gold dbt models (single source of truth).
 
-- sma.sql
-- ema.sql
-- rsi.sql
-- atr.sql
-- bollinger.sql
-- macd.sql
+Obsolete indicator macros were removed.
 
-(Note: ADX was removed as it was not implemented to avoid placeholders.)
+ADX was removed entirely (no placeholders).
 
 ## Incremental Strategy
 
