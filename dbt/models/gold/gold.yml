@@ -248,3 +248,71 @@ models:
         tests: [not_null]
       - name: open_time
         tests: [not_null]
+
+  # Gold Feature Tables - Final consolidated datasets (keys + Features + Signals)
+  - name: market_dataset_5m
+    description: |
+      Final Gold Feature Table for 5-minute timeframe.
+      Consolidated dataset containing only keys + all trading features + all signals.
+      No OHLCV or raw indicators. Intended for trading bot, backtesting, ML and dashboards.
+      Consumes exclusively market_indicators_5m, market_features_5m and market_signals_5m.
+    columns:
+      - name: exchange
+        description: Exchange identifier.
+        tests: [not_null]
+      - name: symbol
+        description: Trading pair symbol.
+        tests: [not_null]
+      - name: open_time
+        description: Candle open timestamp.
+        tests: [not_null]
+      - name: ema9_distance_pct
+      - name: ema_alignment
+      - name: rsi_normalized
+      - name: atr_pct
+      - name: candle_body_ratio
+      - name: ema_bullish_alignment
+      - name: rsi_overbought
+      - name: high_volatility
+      - name: new_20_high
+      - name: breakout_confirmation
+
+  - name: market_dataset_15m
+    description: Final Gold Feature Table for 15-minute timeframe. Keys + Features + Signals only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_dataset_30m
+    description: Final Gold Feature Table for 30-minute timeframe. Keys + Features + Signals only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_dataset_1h
+    description: Final Gold Feature Table for 1-hour timeframe. Keys + Features + Signals only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
+
+  - name: market_dataset_1d
+    description: Final Gold Feature Table for daily timeframe. Keys + Features + Signals only.
+    columns:
+      - name: exchange
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null]
+      - name: open_time
+        tests: [not_null]
