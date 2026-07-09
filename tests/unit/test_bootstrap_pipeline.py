@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, call, patch
 
 from src.extraction.binance_extractor import BINANCE_KLINES_MAX_LIMIT
@@ -238,11 +238,20 @@ class TestBootstrapPipeline(unittest.TestCase):
             "bootstrap_status": "pending",
             "last_bootstrap_open_time": None,
         }
+        # Open times must sit inside the resolved history window (now - history_days).
+        base_ms = int(
+            (datetime.now(timezone.utc) - timedelta(hours=20)).timestamp() * 1000
+        )
         block1 = [
-            _fake_kline_record("BTCUSDT", i * 60_000)
+            _fake_kline_record("BTCUSDT", base_ms + i * 60_000)
             for i in range(BINANCE_KLINES_MAX_LIMIT)
         ]
-        block2 = [_fake_kline_record("BTCUSDT", BINANCE_KLINES_MAX_LIMIT * 60_000)]
+        block2 = [
+            _fake_kline_record(
+                "BTCUSDT",
+                base_ms + BINANCE_KLINES_MAX_LIMIT * 60_000,
+            )
+        ]
         self.extractor.extract_klines.side_effect = [block1, block2]
         self.loader.insert_klines.side_effect = [
             BINANCE_KLINES_MAX_LIMIT,
@@ -266,7 +275,7 @@ class TestBootstrapPipeline(unittest.TestCase):
         self.assertEqual(self.loader.insert_klines.call_count, 2)
         # Second request must start after last open of first block
         second_call = self.extractor.extract_klines.call_args_list[1]
-        expected_start = (BINANCE_KLINES_MAX_LIMIT - 1) * 60_000 + 1
+        expected_start = base_ms + (BINANCE_KLINES_MAX_LIMIT - 1) * 60_000 + 1
         self.assertEqual(second_call.kwargs["start_time"], expected_start)
 
     def test_resume_from_last_bootstrap_open_time(self) -> None:
