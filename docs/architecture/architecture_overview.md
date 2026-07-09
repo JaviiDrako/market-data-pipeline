@@ -26,6 +26,12 @@ The project has been designed to support additional market data providers withou
              ▼
      Market Data Extractor
              │
+     ┌───────┴────────┐
+     ▼                ▼
+ BronzePipeline   BootstrapPipeline
+ (incremental)    (historical klines)
+     │                │
+     └───────┬────────┘
              ▼
         Bronze Loader
              │
@@ -35,6 +41,7 @@ The project has been designed to support additional market data providers withou
      ┌───────┴────────┐
      ▼                ▼
  Bronze            Airflow Metadata
+ (configured_symbols)
      │
      ▼
     dbt
