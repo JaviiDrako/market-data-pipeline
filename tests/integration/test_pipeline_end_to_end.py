@@ -6,6 +6,8 @@ from src.common.database import Database
 
 TEST_KLINES = 3000
 
+TIMEFRAMES = ("5m", "15m", "30m", "1h", "1d")
+
 
 def get_count(query: str) -> int:
     connection = Database().get_connection()
@@ -110,8 +112,11 @@ run_dbt_step(
     "RUNNING DBT BUILD"
 )
 
+# ---------------------------------------------------------------------------
+# BRONZE
+# ---------------------------------------------------------------------------
 print("=" * 80)
-print("VERIFYING BRONZE")
+print("BRONZE")
 print("=" * 80)
 
 bronze_price = get_count("SELECT COUNT(*) FROM bronze.binance_price;")
@@ -128,8 +133,11 @@ assert bronze_klines > 0, "No records in bronze.binance_klines"
 
 print()
 
+# ---------------------------------------------------------------------------
+# SILVER
+# ---------------------------------------------------------------------------
 print("=" * 80)
-print("VERIFYING SILVER")
+print("SILVER")
 print("=" * 80)
 
 silver_snapshot = get_count("SELECT COUNT(*) FROM silver.market_snapshot;")
@@ -158,30 +166,118 @@ assert silver_candles_1d > 0
 
 print()
 
+# ---------------------------------------------------------------------------
+# INDICATORS
+# ---------------------------------------------------------------------------
 print("=" * 80)
-print("VERIFYING GOLD")
+print("INDICATORS")
 print("=" * 80)
 
-gold_5m = get_count("SELECT COUNT(*) FROM gold.market_indicators_5m;")
-gold_15m = get_count("SELECT COUNT(*) FROM gold.market_indicators_15m;")
-gold_30m = get_count("SELECT COUNT(*) FROM gold.market_indicators_30m;")
-gold_1h = get_count("SELECT COUNT(*) FROM gold.market_indicators_1h;")
-gold_1d = get_count("SELECT COUNT(*) FROM gold.market_indicators_1d;")
+indicators = {
+    tf: get_count(f"SELECT COUNT(*) FROM gold.market_indicators_{tf};")
+    for tf in TIMEFRAMES
+}
 
-print(f"Gold Indicators 5m   : {gold_5m}")
-print(f"Gold Indicators 15m  : {gold_15m}")
-print(f"Gold Indicators 30m  : {gold_30m}")
-print(f"Gold Indicators 1h   : {gold_1h}")
-print(f"Gold Indicators 1d   : {gold_1d}")
+for tf in TIMEFRAMES:
+    print(f"Gold Indicators {tf:3} : {indicators[tf]}")
 
-assert gold_5m > 0
-assert gold_15m > 0
-assert gold_30m > 0
-assert gold_1h > 0
-assert gold_1d > 0
+for tf in TIMEFRAMES:
+    assert indicators[tf] > 0, f"No records in gold.market_indicators_{tf}"
 
 print()
 
+# ---------------------------------------------------------------------------
+# FEATURES
+# ---------------------------------------------------------------------------
 print("=" * 80)
-print("PIPELINE END-TO-END TEST PASSED")
+print("FEATURES")
+print("=" * 80)
+
+features = {
+    tf: get_count(f"SELECT COUNT(*) FROM gold.market_features_{tf};")
+    for tf in TIMEFRAMES
+}
+
+for tf in TIMEFRAMES:
+    print(f"Gold Features {tf:3}   : {features[tf]}")
+
+for tf in TIMEFRAMES:
+    assert features[tf] > 0, f"No records in gold.market_features_{tf}"
+
+print()
+
+# ---------------------------------------------------------------------------
+# SIGNALS
+# ---------------------------------------------------------------------------
+print("=" * 80)
+print("SIGNALS")
+print("=" * 80)
+
+signals = {
+    tf: get_count(f"SELECT COUNT(*) FROM gold.market_signals_{tf};")
+    for tf in TIMEFRAMES
+}
+
+for tf in TIMEFRAMES:
+    print(f"Gold Signals {tf:3}    : {signals[tf]}")
+
+for tf in TIMEFRAMES:
+    assert signals[tf] > 0, f"No records in gold.market_signals_{tf}"
+
+print()
+
+# ---------------------------------------------------------------------------
+# FEATURE TABLES
+# ---------------------------------------------------------------------------
+print("=" * 80)
+print("FEATURE TABLES")
+print("=" * 80)
+
+datasets = {
+    tf: get_count(f"SELECT COUNT(*) FROM gold.market_dataset_{tf};")
+    for tf in TIMEFRAMES
+}
+
+for tf in TIMEFRAMES:
+    print(f"Gold Dataset {tf:3}    : {datasets[tf]}")
+
+for tf in TIMEFRAMES:
+    assert datasets[tf] > 0, f"No records in gold.market_dataset_{tf}"
+
+print()
+
+# ---------------------------------------------------------------------------
+# CONSISTENCY CHECKS
+# Indicators == Features == Signals == Dataset per timeframe
+# ---------------------------------------------------------------------------
+print("=" * 80)
+print("CONSISTENCY CHECKS")
+print("=" * 80)
+
+for tf in TIMEFRAMES:
+    ind = indicators[tf]
+    feat = features[tf]
+    sig = signals[tf]
+    ds = datasets[tf]
+
+    print(
+        f"{tf:3}  indicators={ind}  features={feat}  signals={sig}  dataset={ds}"
+    )
+
+    assert ind == feat, (
+        f"Row count mismatch for {tf}: indicators ({ind}) != features ({feat})"
+    )
+    assert feat == sig, (
+        f"Row count mismatch for {tf}: features ({feat}) != signals ({sig})"
+    )
+    assert sig == ds, (
+        f"Row count mismatch for {tf}: signals ({sig}) != dataset ({ds})"
+    )
+
+print()
+print("All timeframes: Indicators == Features == Signals == Dataset")
+print()
+
+print("=" * 80)
+print("PASSED")
 print("=" * 80)
