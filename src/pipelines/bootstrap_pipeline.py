@@ -98,21 +98,36 @@ class BootstrapPipeline:
             raise
 
     def _sync_symbols_from_yaml(self) -> None:
-        """Insert YAML symbols missing from configured_symbols as PENDING."""
+        """
+        Upsert YAML symbols into configured_symbols.
+
+        - New symbols are inserted as PENDING with history_days from config.
+        - Existing non-completed symbols refresh history_days from YAML so
+          changing config.yaml does not require Python edits or manual SQL.
+        """
         existing = {
-            (r["exchange"], r["symbol"])
+            (r["exchange"], r["symbol"]): r
             for r in self._fetch_all_configured_symbols()
         }
 
         for symbol in self._yaml_symbols:
             key = (EXCHANGE, symbol)
-            if key in existing:
+            if key not in existing:
+                self._insert_configured_symbol(
+                    exchange=EXCHANGE,
+                    symbol=symbol,
+                    history_days=self._default_history_days,
+                )
                 continue
-            self._insert_configured_symbol(
-                exchange=EXCHANGE,
-                symbol=symbol,
-                history_days=self._default_history_days,
-            )
+
+            row = existing[key]
+            # Keep YAML as source of truth for history window until completed.
+            if row.get("bootstrap_status") != "completed":
+                self._refresh_history_days(
+                    EXCHANGE,
+                    symbol,
+                    self._default_history_days,
+                )
 
     def _bootstrap_symbol(
         self,
@@ -158,7 +173,12 @@ class BootstrapPipeline:
                 )
 
                 # Advance past the last candle (startTime is inclusive on Binance).
-                current_start = last_open + 1
+                # max() prevents current_start from moving backwards if the API
+                # ever returns an unexpected open_time (avoids infinite loops).
+                next_start = last_open + 1
+                if next_start <= current_start:
+                    break
+                current_start = next_start
 
                 if len(batch) < BINANCE_KLINES_MAX_LIMIT:
                     break
@@ -233,6 +253,25 @@ class BootstrapPipeline:
             ON CONFLICT (exchange, symbol) DO NOTHING
         """
         self._execute(query, (exchange, symbol, history_days))
+
+    def _refresh_history_days(
+        self,
+        exchange: str,
+        symbol: str,
+        history_days: int,
+    ) -> None:
+        query = """
+            UPDATE bronze.configured_symbols
+            SET history_days = %s,
+                updated_at = %s
+            WHERE exchange = %s
+              AND symbol = %s
+              AND bootstrap_status <> 'completed'
+        """
+        self._execute(
+            query,
+            (history_days, datetime.now(timezone.utc), exchange, symbol),
+        )
 
     def _mark_running(self, exchange: str, symbol: str) -> None:
         query = """
