@@ -18,11 +18,8 @@ class BinanceExtractor(MarketDataExtractor):
         self._settings = settings
         self._client = client
 
-        self._source = self._settings.get_source("binance")
-        self._symbols: list[str] = self._source.get("symbols", [])
-
-        klines = self._source.get("historical", {})
-        self._interval: str = klines.get("interval", "1m")
+        self._symbols: list[str] = self._settings.get_symbols("binance")
+        self._interval: str = self._settings.get_history_interval("binance")
 
     def extract_klines(
         self,

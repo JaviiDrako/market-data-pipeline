@@ -28,10 +28,10 @@ def _fake_kline_record(symbol: str, open_ms: int) -> dict:
 class TestBootstrapPipeline(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = MagicMock()
-        self.settings.get_source.return_value = {
-            "symbols": ["BTCUSDT", "ETHUSDT"],
-            "historical": {"interval": "1m", "days": 7},
-        }
+        self.settings.get_symbols.return_value = ["BTCUSDT", "ETHUSDT"]
+        self.settings.get_history_days.return_value = 7
+        self.settings.get_history_interval.return_value = "1m"
+        self.settings.get_historical.return_value = {"days": 7, "interval": "1m"}
         self.database = MagicMock()
         self.extractor = MagicMock()
         self.loader = MagicMock()

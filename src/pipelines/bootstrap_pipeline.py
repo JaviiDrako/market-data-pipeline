@@ -49,11 +49,10 @@ class BootstrapPipeline:
         self._monitor = monitor or PipelineMonitor(self._database)
         self._data_quality = data_quality or DataQuality()
 
-        source = self._settings.get_source(EXCHANGE)
-        self._yaml_symbols: list[str] = list(source.get("symbols", []))
-        historical = source.get("historical", {})
-        self._default_history_days: int = int(historical.get("days", 365))
-        self._interval: str = str(historical.get("interval", "1m"))
+        # Sole source of truth: config.yaml via Settings (no direct YAML access).
+        self._yaml_symbols: list[str] = self._settings.get_symbols(EXCHANGE)
+        self._history_days: int = self._settings.get_history_days(EXCHANGE)
+        self._interval: str = self._settings.get_history_interval(EXCHANGE)
 
     def run(self, dag_run_id: str) -> int:
         """
@@ -116,17 +115,17 @@ class BootstrapPipeline:
                 self._insert_configured_symbol(
                     exchange=EXCHANGE,
                     symbol=symbol,
-                    history_days=self._default_history_days,
+                    history_days=self._history_days,
                 )
                 continue
 
             row = existing[key]
-            # Keep YAML as source of truth for history window until completed.
+            # Keep Settings/config.yaml as source of truth until completed.
             if row.get("bootstrap_status") != "completed":
                 self._refresh_history_days(
                     EXCHANGE,
                     symbol,
-                    self._default_history_days,
+                    self._history_days,
                 )
 
     def _bootstrap_symbol(

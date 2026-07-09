@@ -8,5 +8,5 @@ sources:
       - SOLUSDT
     historical:
       interval: 1m
-      days: 365
+      days: 100
 

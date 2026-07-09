@@ -29,10 +29,9 @@ def _fake_kline(open_ms: int) -> list:
 class TestBinanceExtractor(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = MagicMock()
-        self.settings.get_source.return_value = {
-            "symbols": ["BTCUSDT", "ETHUSDT"],
-            "historical": {"interval": "1m", "days": 365},
-        }
+        self.settings.get_symbols.return_value = ["BTCUSDT", "ETHUSDT"]
+        self.settings.get_history_interval.return_value = "1m"
+        self.settings.get_history_days.return_value = 365
         self.client = MagicMock()
         self.extractor = BinanceExtractor(self.settings, self.client)
 
