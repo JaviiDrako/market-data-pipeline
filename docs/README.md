@@ -31,6 +31,8 @@ Architecture Decision Records describing the main architectural decisions adopte
 
 General documentation about the project architecture, Medallion Architecture and orchestration design.
 
+Includes `bootstrap_pipeline.md` for the historical kline Bootstrap Pipeline.
+
 ---
 
 ## Database
