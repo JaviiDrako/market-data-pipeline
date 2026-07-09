@@ -125,3 +125,46 @@ CREATE TABLE IF NOT EXISTS bronze.binance_ticker_24h (
 
 CREATE INDEX IF NOT EXISTS idx_binance_ticker_24h_symbol_ingested_at
     ON bronze.binance_ticker_24h (symbol, ingested_at);
+
+-- Operational control table for bootstrap / symbol lifecycle.
+-- No foreign keys: intentionally decoupled from market data tables.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_type t
+        JOIN pg_namespace n
+            ON n.oid = t.typnamespace
+        WHERE t.typname = 'bootstrap_status'
+          AND n.nspname = 'bronze'
+    ) THEN
+        CREATE TYPE bronze.bootstrap_status AS ENUM (
+            'pending',
+            'running',
+            'completed',
+            'failed'
+        );
+    END IF;
+END
+$$;
+
+CREATE TABLE IF NOT EXISTS bronze.configured_symbols (
+    exchange VARCHAR(50) NOT NULL,
+    symbol VARCHAR(20) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    history_days INTEGER NOT NULL DEFAULT 365,
+    bootstrap_status bronze.bootstrap_status NOT NULL DEFAULT 'pending',
+    last_bootstrap_open_time TIMESTAMPTZ,
+    bootstrap_started_at TIMESTAMPTZ,
+    bootstrap_completed_at TIMESTAMPTZ,
+    last_incremental_at TIMESTAMPTZ,
+    last_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (exchange, symbol),
+    CHECK (history_days > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_configured_symbols_bootstrap_status
+    ON bronze.configured_symbols (bootstrap_status)
+    WHERE enabled = TRUE;

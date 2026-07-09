@@ -123,6 +123,8 @@ class BinanceLoader:
         if not records:
             return 0
 
+        # ON CONFLICT uses the existing PK (symbol, open_time) — no manual
+        # Python de-duplication. Safe for bootstrap resume and re-runs.
         query = """
             INSERT INTO bronze.binance_klines (
                 pipeline_run_id,
@@ -140,6 +142,7 @@ class BinanceLoader:
                 taker_buy_quote_volume
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (symbol, open_time) DO NOTHING
         """
 
         values = [

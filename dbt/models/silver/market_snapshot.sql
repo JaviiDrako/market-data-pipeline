@@ -4,6 +4,37 @@
     incremental_strategy='merge'
 ) }}
 
+-- Always one row per (exchange, symbol): latest price + latest ticker only.
+-- Prevents MERGE "cannot affect row a second time" from multi-row joins.
+
+WITH latest_price AS (
+    SELECT *
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER (
+                PARTITION BY exchange, symbol
+                ORDER BY ingested_at DESC
+            ) AS rn
+        FROM {{ ref('stg_binance_price') }}
+    ) ranked
+    WHERE rn = 1
+),
+
+latest_ticker AS (
+    SELECT *
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER (
+                PARTITION BY exchange, symbol
+                ORDER BY ingested_at DESC
+            ) AS rn
+        FROM {{ ref('stg_binance_ticker_24h') }}
+    ) ranked
+    WHERE rn = 1
+)
+
 SELECT
     p.exchange,
     p.symbol,
@@ -33,8 +64,8 @@ SELECT
         t.ingested_at
     ) AS snapshot_time
 
-FROM {{ ref('stg_binance_price') }} p
+FROM latest_price p
 
-INNER JOIN {{ ref('stg_binance_ticker_24h') }} t
+INNER JOIN latest_ticker t
     ON p.exchange = t.exchange
    AND p.symbol = t.symbol

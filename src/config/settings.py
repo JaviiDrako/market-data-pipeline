@@ -46,3 +46,33 @@ class Settings:
             settings.get_source("yahoo")
         """
         return self.sources.get(source_name, {})
+
+    def get_symbols(self, source_name: str) -> list[str]:
+        """Return configured trading symbols for a data source."""
+        symbols = self.get_source(source_name).get("symbols", [])
+        return list(symbols) if symbols else []
+
+    def get_historical(self, source_name: str) -> dict[str, Any]:
+        """
+        Return historical bootstrap settings for a data source.
+
+        Reads ``sources.<source>.historical`` from config.yaml.
+
+        Returns:
+            dict with:
+            - days (int): depth of history to load (default 365)
+            - interval (str): candle interval, e.g. ``1m`` (default ``1m``)
+        """
+        historical = self.get_source(source_name).get("historical") or {}
+        return {
+            "days": int(historical.get("days", 365)),
+            "interval": str(historical.get("interval", "1m")),
+        }
+
+    def get_history_days(self, source_name: str) -> int:
+        """Return historical depth in days for a data source."""
+        return int(self.get_historical(source_name)["days"])
+
+    def get_history_interval(self, source_name: str) -> str:
+        """Return historical candle interval for a data source."""
+        return str(self.get_historical(source_name)["interval"])

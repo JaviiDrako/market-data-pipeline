@@ -4,6 +4,7 @@ from src.clients.binance.client import BinanceClient
 from src.common.database import Database
 from src.config.settings import Settings
 from src.extraction.binance_extractor import BinanceExtractor
+from src.extraction.market_data_extractor import MarketDataExtractor
 from src.loading.binance_loader import BinanceLoader
 from src.monitoring.pipeline_monitor import PipelineMonitor
 from src.quality.data_quality import DataQuality
@@ -12,11 +13,17 @@ from src.quality.data_quality import DataQuality
 class BronzePipeline:
     """Orchestrates extraction, validation, loading, and monitoring for Bronze."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        extractor: MarketDataExtractor | None = None,
+    ) -> None:
         self._settings = Settings()
         self._database = Database(self._settings)
         self._client = BinanceClient()
-        self._extractor = BinanceExtractor(self._settings, self._client)
+        self._extractor: MarketDataExtractor = extractor or BinanceExtractor(
+            self._settings,
+            self._client,
+        )
         self._data_quality = DataQuality()
         self._loader = BinanceLoader(self._database)
         self._monitor = PipelineMonitor(self._database)
@@ -44,7 +51,8 @@ class BronzePipeline:
                 pipeline_run_id,
             )
 
-            latest_klines = self._extractor.extract_latest_klines()
+            # Same behaviour as before: latest closed kline per symbol (limit=1, no dates).
+            latest_klines = self._extractor.extract_klines(limit=1)
             self._data_quality.validate_latest_klines(latest_klines)
             total_inserted_rows += self._loader.insert_klines(
                 latest_klines,
