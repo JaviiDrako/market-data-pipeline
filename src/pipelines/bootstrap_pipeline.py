@@ -69,8 +69,20 @@ class BootstrapPipeline:
             self._sync_symbols_from_yaml()
 
             symbols = self._fetch_symbols_needing_bootstrap()
+            symbol_errors: list[str] = []
+
             for row in symbols:
-                total_inserted += self._bootstrap_symbol(row, pipeline_run_id)
+                try:
+                    total_inserted += self._bootstrap_symbol(row, pipeline_run_id)
+                except Exception as symbol_exc:
+                    # Symbol already marked FAILED inside _bootstrap_symbol.
+                    symbol_errors.append(f"{row['symbol']}: {symbol_exc}")
+
+            if symbol_errors:
+                raise RuntimeError(
+                    "Bootstrap failed for one or more symbols: "
+                    + "; ".join(symbol_errors)
+                )
 
             self._monitor.finish_success(
                 pipeline_run_id,
