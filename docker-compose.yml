@@ -40,7 +40,7 @@ services:
       DBT_PASSWORD: airflow
       DBT_DBNAME: market_data
       # Install pipeline + dbt deps inside the Airflow image on start
-      _PIP_ADDITIONAL_REQUIREMENTS: dbt-postgres==1.10.2 'psycopg[binary]==3.2.10' PyYAML==6.0.3 requests==2.34.2 tenacity==8.2.3
+      _PIP_ADDITIONAL_REQUIREMENTS: dbt-postgres==1.10.2 psycopg[binary]==3.2.10 PyYAML==6.0.3 requests==2.34.2 tenacity==8.2.3
     depends_on:
       postgres:
         condition: service_healthy

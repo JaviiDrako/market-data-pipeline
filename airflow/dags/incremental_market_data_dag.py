@@ -107,6 +107,12 @@ def incremental_market_data():
         """
         dbt_dir = PROJECT_ROOT / "dbt"
         profiles_dir = dbt_dir
+        # Host-mounted dbt/logs and dbt/target are often not writable by
+        # the airflow user; keep artifacts inside the container.
+        log_path = Path(os.environ.get("DBT_LOG_PATH", "/tmp/dbt_logs"))
+        target_path = Path(os.environ.get("DBT_TARGET_PATH", "/tmp/dbt_target"))
+        log_path.mkdir(parents=True, exist_ok=True)
+        target_path.mkdir(parents=True, exist_ok=True)
 
         cmd = [
             "dbt",
@@ -115,6 +121,10 @@ def incremental_market_data():
             str(dbt_dir),
             "--profiles-dir",
             str(profiles_dir),
+            "--log-path",
+            str(log_path),
+            "--target-path",
+            str(target_path),
         ]
         logger.info("Running dbt build: %s", " ".join(cmd))
 
@@ -124,6 +134,7 @@ def incremental_market_data():
             capture_output=True,
             text=True,
             check=False,
+            env={**os.environ},
         )
 
         if result.stdout:
