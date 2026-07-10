@@ -28,11 +28,25 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
       AIRFLOW__CORE__DEFAULT_TIMEZONE: UTC
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
+      # Project code + config for DAGs (orchestration only; logic stays in src/dbt)
+      PROJECT_ROOT: /opt/airflow/project
+      PYTHONPATH: /opt/airflow/project
+      # Warehouse reachable on Docker network
+      WAREHOUSE_HOST: postgres
+      WAREHOUSE_PORT: "5432"
+      DBT_HOST: postgres
+      DBT_PORT: "5432"
+      DBT_USER: airflow
+      DBT_PASSWORD: airflow
+      DBT_DBNAME: market_data
+      # Install pipeline + dbt deps inside the Airflow image on start
+      _PIP_ADDITIONAL_REQUIREMENTS: dbt-postgres==1.10.2 'psycopg[binary]==3.2.10' PyYAML==6.0.3 requests==2.34.2 tenacity==8.2.3
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
     command: >
       bash -c 'airflow db migrate && airflow users create
       --username "$${AIRFLOW_ADMIN_USERNAME}"
@@ -56,6 +70,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
     ports:
       - "8080:8080"
     command: webserver
@@ -74,6 +89,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./airflow/dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
     command: scheduler
 
 volumes:
