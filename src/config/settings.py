@@ -76,3 +76,14 @@ class Settings:
     def get_history_interval(self, source_name: str) -> str:
         """Return historical candle interval for a data source."""
         return str(self.get_historical(source_name)["interval"])
+
+    def get_pipeline_schedule(self, source_name: str = "binance") -> str:
+        """
+        Return the Airflow cron schedule for the incremental pipeline.
+
+        Derived from ``sources.<source>.historical.interval`` in config.yaml
+        via :func:`src.common.interval_cron.interval_to_cron`.
+        """
+        from src.common.interval_cron import interval_to_cron
+
+        return interval_to_cron(self.get_history_interval(source_name))

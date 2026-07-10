@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -33,9 +34,23 @@ class Database:
             database_config.get("name", self._env_config["WAREHOUSE_DB"]),
         )
 
+        # WAREHOUSE_* env vars allow Airflow containers to reach postgres
+        # on the Docker network (host=postgres, port=5432) without changing
+        # local host defaults (localhost:5433).
+        host = os.environ.get(
+            "WAREHOUSE_HOST",
+            database_config.get("host", "localhost"),
+        )
+        port = int(
+            os.environ.get(
+                "WAREHOUSE_PORT",
+                str(database_config.get("port", self._get_postgres_port())),
+            )
+        )
+
         return psycopg.connect(
-            host=database_config.get("host", "localhost"),
-            port=database_config.get("port", self._get_postgres_port()),
+            host=host,
+            port=port,
             user=database_config.get("user", self._env_config["POSTGRES_USER"]),
             password=database_config.get(
                 "password",

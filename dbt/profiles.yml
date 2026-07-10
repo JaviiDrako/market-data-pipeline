@@ -1,0 +1,16 @@
+# dbt profiles used by Airflow and optional local --profiles-dir runs.
+# Defaults match local docker-compose host port mapping.
+# Inside Airflow containers set DBT_HOST=postgres and DBT_PORT=5432.
+market_data_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST', 'localhost') }}"
+      port: "{{ env_var('DBT_PORT', '5433') | as_number }}"
+      user: "{{ env_var('DBT_USER', 'airflow') }}"
+      password: "{{ env_var('DBT_PASSWORD', 'airflow') }}"
+      dbname: "{{ env_var('DBT_DBNAME', 'market_data') }}"
+      schema: silver
+      threads: 4
+      keepalives_idle: 0
