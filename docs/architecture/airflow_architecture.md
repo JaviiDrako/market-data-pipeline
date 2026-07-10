@@ -1,29 +1,66 @@
-# Airflow Architecture – Incremental DAG
+# Airflow Architecture – Market Data DAGs
 
 ## Purpose
 
-Apache Airflow orchestrates the **incremental production pipeline**.
+Apache Airflow orchestrates the market data pipelines.
 
-It does **not** contain business logic. It only schedules and invokes:
+It does **not** contain business logic. It only schedules (or triggers) and invokes:
 
-1. `BronzePipeline` (Python) – latest market data into Bronze  
-2. `dbt build` – staging → silver → gold transformations  
+| Component | Role |
+|-----------|------|
+| `BronzePipeline` | Incremental extract → validate → load into Bronze |
+| `BootstrapPipeline` | Historical kline load into Bronze |
+| `dbt build` | Staging → Silver → Gold transformations |
 
-Bootstrap and maintenance DAGs are out of scope for this document (future sprints).
+All business logic remains in `src/pipelines/` and `dbt/`.
 
 ---
 
-## Incremental DAG
+## Two DAGs
 
-| Field | Value |
-|-------|--------|
-| **DAG id** | `incremental_market_data` |
-| **File** | `airflow/dags/incremental_market_data_dag.py` |
-| **Schedule** | Derived from `config.yaml` (not hard-coded in the DAG) |
-| **Catchup** | `False` |
-| **max_active_runs** | `1` (no overlapping incremental runs) |
+| | Incremental | Bootstrap |
+|--|-------------|-----------|
+| **DAG id** | `incremental_market_data` | `bootstrap_market_data` |
+| **File** | `airflow/dags/incremental_market_data_dag.py` | `airflow/dags/bootstrap_market_data_dag.py` |
+| **Schedule** | From `config.yaml` interval → cron | **None** (manual only) |
+| **When to use** | Continuous production loads | Initial / resume historical load |
+| **Pipeline** | `BronzePipeline` | `BootstrapPipeline` |
+| **Then** | `dbt build` | `dbt build` |
+| **catchup** | `False` | `False` |
+| **max_active_runs** | `1` | `1` |
+| **owner** | `market-data` | `market-data` |
+| **retries** | `1` (delay 2 min) | `1` (delay 2 min) |
 
-### Flow
+Both DAGs are independent. Running one does not replace the other.
+
+---
+
+## When to use each DAG
+
+### Incremental (`incremental_market_data`)
+
+- Scheduled automatically (e.g. every minute if `interval: 1m`).
+- Loads the **latest** price, 24h ticker, and klines.
+- Run continuously in production after bootstrap has completed.
+
+### Bootstrap (`bootstrap_market_data`)
+
+- **No schedule** — trigger only from the UI or CLI.
+- Loads **historical** klines for symbols in `config.yaml` / `configured_symbols`.
+- Uses `history_days` from Settings (`sources.binance.historical.days`).
+- Supports resume via `last_bootstrap_open_time`.
+- Use once per environment (or after adding symbols / failed history).
+
+Typical order for a new environment:
+
+1. Trigger **Bootstrap** (manual) → historical Bronze + dbt.  
+2. Enable **Incremental** schedule → ongoing updates.
+
+---
+
+## Flows
+
+### Incremental
 
 ```
 start
@@ -35,13 +72,28 @@ run_dbt_build         →  dbt build (full project graph)
 finish
 ```
 
-`dbt build` runs the entire project; dbt resolves model dependencies. The DAG does not select individual models.
+### Bootstrap
+
+```
+start
+  ↓
+run_bootstrap_pipeline   →  BootstrapPipeline.run(dag_run_id)
+  ↓
+run_dbt_build            →  dbt build (full project graph)
+  ↓
+finish
+```
+
+In both cases:
+
+- `dbt build` runs only if the previous pipeline task succeeds.
+- dbt resolves model dependencies; the DAGs do not select individual models.
 
 ---
 
-## Schedule frequency
+## Incremental schedule frequency
 
-The schedule is **not** hard-coded in the DAG.
+The incremental schedule is **not** hard-coded in the DAG.
 
 ### Source of truth
 
@@ -51,10 +103,10 @@ sources:
   binance:
     historical:
       interval: 1m    # ← controls incremental Airflow schedule
-      days: 100
+      days: 100       # ← controls bootstrap history depth
 ```
 
-### Resolution path
+### Resolution path (incremental only)
 
 ```
 config.yaml
@@ -83,20 +135,13 @@ Settings().get_pipeline_schedule("binance")
 | `1h` | `0 * * * *` | Every hour |
 | `1d` | `0 0 * * *` | Daily at 00:00 UTC |
 
-### How to change the frequency
+### How to change the incremental frequency
 
-1. Edit `src/config/config.yaml`:
+1. Edit `src/config/config.yaml` → `sources.binance.historical.interval`.
+2. Wait for the Airflow scheduler to re-parse DAGs (or restart).
+3. No DAG code changes are required.
 
-```yaml
-sources:
-  binance:
-    historical:
-      interval: 5m   # e.g. switch from 1m to 5m
-```
-
-2. Restart or wait for the Airflow scheduler to re-parse DAGs.
-
-3. No Python/DAG code changes are required.
+Bootstrap remains manual regardless of `interval`.
 
 ---
 
@@ -113,25 +158,35 @@ Airflow services mount the repository at `/opt/airflow/project` and set:
 
 Dependencies (`dbt-postgres`, `psycopg`, etc.) are installed via Airflow’s `_PIP_ADDITIONAL_REQUIREMENTS`.
 
+dbt uses writable paths under `/tmp` for logs and target inside the container.
+
 ---
 
-## Manual trigger
+## Manual triggers
 
-1. Open Airflow UI: `http://localhost:8080` (default admin credentials from `docker/.env`).
-2. Find DAG `incremental_market_data`.
-3. Unpause if needed.
-4. Trigger → “Trigger DAG”.
-5. Confirm tasks: `start` → `run_bronze_pipeline` → `run_dbt_build` → `finish` all succeed.
-
-CLI alternative:
+### Incremental
 
 ```bash
 docker exec market_data_airflow_scheduler \
-  airflow dags trigger incremental_market_data
+  airflow dags unpause incremental_market_data
 
 docker exec market_data_airflow_scheduler \
-  airflow dags list-runs -d incremental_market_data
+  airflow dags trigger incremental_market_data
 ```
+
+### Bootstrap
+
+```bash
+docker exec market_data_airflow_scheduler \
+  airflow dags unpause bootstrap_market_data
+
+docker exec market_data_airflow_scheduler \
+  airflow dags trigger bootstrap_market_data
+```
+
+UI: `http://localhost:8080` → select DAG → Trigger.
+
+Confirm tasks end in **success** for both DAGs.
 
 ---
 
@@ -139,8 +194,10 @@ docker exec market_data_airflow_scheduler \
 
 | Decision | Rationale |
 |----------|-----------|
-| TaskFlow + EmptyOperator | Clear task names and typed task bodies |
-| `retries=1`, `retry_delay=2m` | Tolerate transient Binance/DB blips without long backfills |
-| `max_active_runs=1` | Prevent concurrent merges on incremental tables |
+| Two separate DAGs | Different cadence (scheduled vs manual) and different pipelines |
+| TaskFlow + EmptyOperator | Clear task names; same style across DAGs |
+| Bootstrap `schedule=None` | Historical load is intentional, not periodic |
+| `retries=1`, `retry_delay=2m` | Tolerate transient Binance/DB blips |
+| `max_active_runs=1` | Avoid concurrent heavy loads / merges |
 | Logging (not print) | Airflow task logs only |
-| Cron utility in `src/common` | Reusable by future Bootstrap/maintenance DAGs |
+| No SQL / no business logic in DAGs | All logic in `src/pipelines` and dbt |
