@@ -2,36 +2,54 @@
 
 ## Purpose
 
-Apache Airflow orchestrates the market data pipelines.
+Apache Airflow orchestrates the market data pipelines **and** daily system health checks.
 
-It does **not** contain business logic. It only schedules (or triggers) and invokes:
+It does **not** contain business logic for extraction or transformation. Pipelines and dbt own that work. The maintenance DAG only **validates** warehouse state.
 
 | Component | Role |
 |-----------|------|
 | `BronzePipeline` | Incremental extract → validate → load into Bronze |
 | `BootstrapPipeline` | Historical kline load into Bronze |
 | `dbt build` | Staging → Silver → Gold transformations |
+| `maintenance_checks` | Read-only data quality / freshness checks |
 
-All business logic remains in `src/pipelines/` and `dbt/`.
+All pipeline logic remains in `src/pipelines/` and `dbt/`.  
+Maintenance checks live in `src/quality/maintenance_checks.py`.
 
 ---
 
-## Two DAGs
+## Three DAGs
 
-| | Incremental | Bootstrap |
-|--|-------------|-----------|
-| **DAG id** | `incremental_market_data` | `bootstrap_market_data` |
-| **File** | `airflow/dags/incremental_market_data_dag.py` | `airflow/dags/bootstrap_market_data_dag.py` |
-| **Schedule** | From `config.yaml` interval → cron | **None** (manual only) |
-| **When to use** | Continuous production loads | Initial / resume historical load |
-| **Pipeline** | `BronzePipeline` | `BootstrapPipeline` |
-| **Then** | `dbt build` | `dbt build` |
-| **catchup** | `False` | `False` |
-| **max_active_runs** | `1` | `1` |
-| **owner** | `market-data` | `market-data` |
-| **retries** | `1` (delay 2 min) | `1` (delay 2 min) |
+```
+┌─────────────────────────┐
+│ incremental_market_data │  scheduled (config interval → cron)
+│ BronzePipeline → dbt    │
+└─────────────────────────┘
 
-Both DAGs are independent. Running one does not replace the other.
+┌─────────────────────────┐
+│ bootstrap_market_data   │  manual only (schedule=None)
+│ BootstrapPipeline → dbt │
+└─────────────────────────┘
+
+┌─────────────────────────┐
+│ maintenance_pipeline    │  daily (00:00 UTC)
+│ health / quality checks │  (no extract, no dbt)
+└─────────────────────────┘
+```
+
+| | Incremental | Bootstrap | Maintenance |
+|--|-------------|-----------|-------------|
+| **DAG id** | `incremental_market_data` | `bootstrap_market_data` | `maintenance_pipeline` |
+| **File** | `airflow/dags/incremental_market_data_dag.py` | `airflow/dags/bootstrap_market_data_dag.py` | `airflow/dags/maintenance_pipeline_dag.py` |
+| **Schedule** | From `config.yaml` interval → cron | **None** (manual) | **Daily** `0 0 * * *` |
+| **When to use** | Continuous production loads | Initial / resume historical load | Daily health monitoring |
+| **Runs** | `BronzePipeline` + `dbt build` | `BootstrapPipeline` + `dbt build` | Validation checks only |
+| **catchup** | `False` | `False` | `False` |
+| **max_active_runs** | `1` | `1` | `1` |
+| **owner** | `market-data` | `market-data` | `market-data` |
+| **retries** | `1` (2 min) | `1` (2 min) | `1` (2 min) |
+
+The three DAGs are independent. None replaces another.
 
 ---
 
@@ -41,20 +59,26 @@ Both DAGs are independent. Running one does not replace the other.
 
 - Scheduled automatically (e.g. every minute if `interval: 1m`).
 - Loads the **latest** price, 24h ticker, and klines.
-- Run continuously in production after bootstrap has completed.
+- Production path after bootstrap has completed.
 
 ### Bootstrap (`bootstrap_market_data`)
 
 - **No schedule** — trigger only from the UI or CLI.
 - Loads **historical** klines for symbols in `config.yaml` / `configured_symbols`.
-- Uses `history_days` from Settings (`sources.binance.historical.days`).
+- Uses `history_days` from Settings.
 - Supports resume via `last_bootstrap_open_time`.
-- Use once per environment (or after adding symbols / failed history).
 
-Typical order for a new environment:
+### Maintenance (`maintenance_pipeline`)
+
+- Runs **once per day** (00:00 UTC) or on demand via Trigger.
+- **Does not** load data or run dbt.
+- Fails loudly if the warehouse looks unhealthy (stale klines, failed bootstrap, empty Gold, etc.).
+
+Typical environment lifecycle:
 
 1. Trigger **Bootstrap** (manual) → historical Bronze + dbt.  
-2. Enable **Incremental** schedule → ongoing updates.
+2. Enable **Incremental** schedule → ongoing updates.  
+3. Keep **Maintenance** enabled → daily automated checks.
 
 ---
 
@@ -67,7 +91,7 @@ start
   ↓
 run_bronze_pipeline   →  BronzePipeline.run(dag_run_id)
   ↓
-run_dbt_build         →  dbt build (full project graph)
+run_dbt_build         →  dbt build
   ↓
 finish
 ```
@@ -79,114 +103,110 @@ start
   ↓
 run_bootstrap_pipeline   →  BootstrapPipeline.run(dag_run_id)
   ↓
-run_dbt_build            →  dbt build (full project graph)
+run_dbt_build            →  dbt build
   ↓
 finish
 ```
 
-In both cases:
+### Maintenance
 
-- `dbt build` runs only if the previous pipeline task succeeds.
-- dbt resolves model dependencies; the DAGs do not select individual models.
+```
+start
+  ↓
+check_pipeline_runs       →  latest bronze.pipeline_runs status = success
+  ↓
+check_configured_symbols  →  all enabled; none bootstrap_status=failed
+  ↓
+check_bronze_freshness    →  MAX(open_time) within threshold
+  ↓
+check_gold_tables         →  5m indicators/features/signals/dataset non-empty
+  ↓
+check_gold_consistency    →  equal row counts on 5m Gold layers
+  ↓
+finish
+```
+
+If any check raises, the task fails (and downstream tasks do not run).
+
+---
+
+## Maintenance checks (detail)
+
+Implemented in `src/quality/maintenance_checks.py` (reusable; DAG only calls them).
+
+| Task | Validation |
+|------|------------|
+| `check_pipeline_runs` | Latest `bronze.pipeline_runs` row has `status='success'` |
+| `check_configured_symbols` | All rows `enabled=true`; none `bootstrap_status='failed'` |
+| `check_bronze_freshness` | `MAX(open_time)` on `bronze.binance_klines` is not older than **2 hours** (`BRONZE_FRESHNESS_MAX_AGE`) |
+| `check_gold_tables` | `gold.market_indicators_5m`, `_features_5m`, `_signals_5m`, `_dataset_5m` each have ≥ 1 row |
+| `check_gold_consistency` | Those four 5m tables have **equal** `COUNT(*)` |
+
+### Bronze freshness threshold
+
+Default: **2 hours**.
+
+Rationale: incremental may run every minute; a 2-hour lag tolerates brief outages without false positives, while still detecting a stuck pipeline.
 
 ---
 
 ## Incremental schedule frequency
 
-The incremental schedule is **not** hard-coded in the DAG.
-
-### Source of truth
+Not hard-coded in the DAG.
 
 ```yaml
 # src/config/config.yaml
 sources:
   binance:
     historical:
-      interval: 1m    # ← controls incremental Airflow schedule
-      days: 100       # ← controls bootstrap history depth
+      interval: 1m    # ← incremental Airflow schedule
+      days: 100       # ← bootstrap history depth
 ```
 
-### Resolution path (incremental only)
-
 ```
-config.yaml
-    ↓
-Settings.get_history_interval("binance")
-    ↓
-interval_to_cron(interval)   # src/common/interval_cron.py
-    ↓
-Airflow schedule (cron)
+config.yaml → Settings.get_history_interval → interval_to_cron → Airflow schedule
 ```
 
-Also available as:
-
-```python
-Settings().get_pipeline_schedule("binance")
-```
-
-### Interval → cron mapping
-
-| Interval | Cron | Meaning |
-|----------|------|---------|
-| `1m` | `* * * * *` | Every minute |
-| `5m` | `*/5 * * * *` | Every 5 minutes |
-| `15m` | `*/15 * * * *` | Every 15 minutes |
-| `30m` | `*/30 * * * *` | Every 30 minutes |
-| `1h` | `0 * * * *` | Every hour |
-| `1d` | `0 0 * * *` | Daily at 00:00 UTC |
-
-### How to change the incremental frequency
-
-1. Edit `src/config/config.yaml` → `sources.binance.historical.interval`.
-2. Wait for the Airflow scheduler to re-parse DAGs (or restart).
-3. No DAG code changes are required.
-
-Bootstrap remains manual regardless of `interval`.
+| Interval | Cron |
+|----------|------|
+| `1m` | `* * * * *` |
+| `5m` | `*/5 * * * *` |
+| `15m` | `*/15 * * * *` |
+| `30m` | `*/30 * * * *` |
+| `1h` | `0 * * * *` |
+| `1d` | `0 0 * * *` |
 
 ---
 
 ## Runtime environment (Docker)
 
-Airflow services mount the repository at `/opt/airflow/project` and set:
-
 | Variable | Purpose |
 |----------|---------|
-| `PROJECT_ROOT` | Path to the repo inside the container |
+| `PROJECT_ROOT` | Repo path in container |
 | `PYTHONPATH` | Import `src.*` from DAGs |
-| `WAREHOUSE_HOST` / `WAREHOUSE_PORT` | Postgres on Docker network (`postgres:5432`) |
-| `DBT_*` | dbt connection for `dbt/profiles.yml` |
+| `WAREHOUSE_HOST` / `WAREHOUSE_PORT` | Postgres on Docker network |
+| `DBT_*` | dbt profiles for pipeline DAGs |
+| `AIRFLOW__WEBSERVER__SECRET_KEY` | Shared across components (UI logs) |
 
-Dependencies (`dbt-postgres`, `psycopg`, etc.) are installed via Airflow’s `_PIP_ADDITIONAL_REQUIREMENTS`.
-
-dbt uses writable paths under `/tmp` for logs and target inside the container.
+Shared volume `airflow_logs` → `/opt/airflow/logs` for UI task log serving.
 
 ---
 
 ## Manual triggers
 
-### Incremental
-
 ```bash
-docker exec market_data_airflow_scheduler \
-  airflow dags unpause incremental_market_data
+# Incremental
+docker exec market_data_airflow_scheduler airflow dags trigger incremental_market_data
 
-docker exec market_data_airflow_scheduler \
-  airflow dags trigger incremental_market_data
-```
+# Bootstrap
+docker exec market_data_airflow_scheduler airflow dags trigger bootstrap_market_data
 
-### Bootstrap
-
-```bash
-docker exec market_data_airflow_scheduler \
-  airflow dags unpause bootstrap_market_data
-
-docker exec market_data_airflow_scheduler \
-  airflow dags trigger bootstrap_market_data
+# Maintenance
+docker exec market_data_airflow_scheduler airflow dags unpause maintenance_pipeline
+docker exec market_data_airflow_scheduler airflow dags trigger maintenance_pipeline
 ```
 
 UI: `http://localhost:8080` → select DAG → Trigger.
-
-Confirm tasks end in **success** for both DAGs.
 
 ---
 
@@ -194,10 +214,9 @@ Confirm tasks end in **success** for both DAGs.
 
 | Decision | Rationale |
 |----------|-----------|
-| Two separate DAGs | Different cadence (scheduled vs manual) and different pipelines |
-| TaskFlow + EmptyOperator | Clear task names; same style across DAGs |
-| Bootstrap `schedule=None` | Historical load is intentional, not periodic |
-| `retries=1`, `retry_delay=2m` | Tolerate transient Binance/DB blips |
-| `max_active_runs=1` | Avoid concurrent heavy loads / merges |
-| Logging (not print) | Airflow task logs only |
-| No SQL / no business logic in DAGs | All logic in `src/pipelines` and dbt |
+| Three separate DAGs | Different cadence and responsibilities |
+| Maintenance has no extract/dbt | Pure observability / quality gate |
+| Checks in `src/quality` | Reusable, unit-testable, DAG stays thin |
+| Daily schedule for maintenance | Enough for ops alerts without noise |
+| TaskFlow + EmptyOperator | Consistent style with other DAGs |
+| `max_active_runs=1` | Avoid concurrent overlapping checks or loads |
