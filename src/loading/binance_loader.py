@@ -5,6 +5,9 @@ from decimal import Decimal
 from typing import Any, Iterable
 
 from src.common.database import Database
+from src.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class BinanceLoader:
@@ -41,6 +44,11 @@ class BinanceLoader:
         ]
 
         self._execute_many(query, values)
+        logger.info(
+            "Inserted current prices (pipeline_run_id=%s, rows=%s)",
+            pipeline_run_id,
+            len(records),
+        )
         return len(records)
 
     def insert_ticker_24h(
@@ -112,6 +120,11 @@ class BinanceLoader:
         ]
 
         self._execute_many(query, values)
+        logger.info(
+            "Inserted 24h tickers (pipeline_run_id=%s, rows=%s)",
+            pipeline_run_id,
+            len(records),
+        )
         return len(records)
 
     def insert_klines(
@@ -181,9 +194,20 @@ class BinanceLoader:
                     if cursor.rowcount and cursor.rowcount > 0:
                         inserted += cursor.rowcount
             connection.commit()
+            logger.info(
+                "Inserted klines (pipeline_run_id=%s, attempted=%s, inserted=%s)",
+                pipeline_run_id,
+                len(records),
+                inserted,
+            )
             return inserted
         except Exception:
             connection.rollback()
+            logger.exception(
+                "Failed inserting klines (pipeline_run_id=%s, attempted=%s)",
+                pipeline_run_id,
+                len(records),
+            )
             raise
         finally:
             connection.close()

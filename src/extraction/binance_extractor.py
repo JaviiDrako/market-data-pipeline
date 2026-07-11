@@ -3,12 +3,15 @@ from __future__ import annotations
 from typing import Any
 
 from src.clients.binance.client import BinanceClient
+from src.common.logger import get_logger
 from src.config.settings import Settings
 from src.extraction.market_data_extractor import MarketDataExtractor
 
 # Binance GET /api/v3/klines hard limit: max 1000 candles per request.
 # See: https://binance-docs.github.io/apidocs/spot/en/#kline-candlestick-data
 BINANCE_KLINES_MAX_LIMIT = 1000
+
+logger = get_logger(__name__)
 
 
 class BinanceExtractor(MarketDataExtractor):
@@ -47,6 +50,15 @@ class BinanceExtractor(MarketDataExtractor):
         target_symbols = symbols if symbols is not None else self._symbols
         extracted_data: list[dict[str, Any]] = []
 
+        logger.info(
+            "Extracting klines (symbols=%s, interval=%s, limit=%s, start_time=%s, end_time=%s)",
+            target_symbols,
+            self._interval,
+            limit,
+            start_time,
+            end_time,
+        )
+
         for symbol in target_symbols:
             klines = self._client.get_historical_klines(
                 symbol=symbol,
@@ -59,6 +71,11 @@ class BinanceExtractor(MarketDataExtractor):
             for kline in klines:
                 extracted_data.append(self._map_kline(symbol, kline))
 
+        logger.info(
+            "Klines extraction finished (symbols=%s, records=%s)",
+            len(target_symbols),
+            len(extracted_data),
+        )
         return extracted_data
 
     def extract_latest_klines(self) -> list[dict[str, Any]]:
@@ -68,6 +85,7 @@ class BinanceExtractor(MarketDataExtractor):
     def extract_current_price(self) -> list[dict[str, Any]]:
         """Extract current prices for configured symbols."""
 
+        logger.info("Extracting current prices (symbols=%s)", self._symbols)
         extracted_data: list[dict[str, Any]] = []
 
         for symbol in self._symbols:
@@ -80,11 +98,13 @@ class BinanceExtractor(MarketDataExtractor):
                 }
             )
 
+        logger.info("Current price extraction finished (records=%s)", len(extracted_data))
         return extracted_data
 
     def extract_ticker_24h(self) -> list[dict[str, Any]]:
         """Extract 24-hour ticker data for configured symbols."""
 
+        logger.info("Extracting 24h tickers (symbols=%s)", self._symbols)
         extracted_data: list[dict[str, Any]] = []
 
         for symbol in self._symbols:
@@ -116,6 +136,7 @@ class BinanceExtractor(MarketDataExtractor):
                 }
             )
 
+        logger.info("24h ticker extraction finished (records=%s)", len(extracted_data))
         return extracted_data
 
     @staticmethod

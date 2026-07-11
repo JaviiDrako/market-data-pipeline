@@ -5,6 +5,7 @@ from typing import Any
 
 from src.clients.binance.client import BinanceClient
 from src.common.database import Database
+from src.common.logger import get_logger
 from src.config.settings import Settings
 from src.extraction.binance_extractor import (
     BINANCE_KLINES_MAX_LIMIT,
@@ -14,6 +15,8 @@ from src.extraction.market_data_extractor import MarketDataExtractor
 from src.loading.binance_loader import BinanceLoader
 from src.monitoring.pipeline_monitor import PipelineMonitor
 from src.quality.data_quality import DataQuality
+
+logger = get_logger(__name__)
 
 EXCHANGE = "binance"
 
@@ -62,12 +65,24 @@ class BootstrapPipeline:
         """
         pipeline_run_id: int | None = None
         total_inserted = 0
+        logger.info(
+            "BootstrapPipeline started (dag_run_id=%s, symbols=%s, history_days=%s, interval=%s)",
+            dag_run_id,
+            self._yaml_symbols,
+            self._history_days,
+            self._interval,
+        )
 
         try:
             pipeline_run_id = self._monitor.start_pipeline(dag_run_id)
             self._sync_symbols_from_yaml()
 
             symbols = self._fetch_symbols_needing_bootstrap()
+            logger.info(
+                "Symbols requiring bootstrap: count=%s symbols=%s",
+                len(symbols),
+                [row["symbol"] for row in symbols],
+            )
             symbol_errors: list[str] = []
 
             for row in symbols:
@@ -75,6 +90,11 @@ class BootstrapPipeline:
                     total_inserted += self._bootstrap_symbol(row, pipeline_run_id)
                 except Exception as symbol_exc:
                     # Symbol already marked FAILED inside _bootstrap_symbol.
+                    logger.error(
+                        "Bootstrap failed for symbol=%s: %s",
+                        row["symbol"],
+                        symbol_exc,
+                    )
                     symbol_errors.append(f"{row['symbol']}: {symbol_exc}")
 
             if symbol_errors:
@@ -87,13 +107,28 @@ class BootstrapPipeline:
                 pipeline_run_id,
                 rows_inserted=total_inserted,
             )
+            logger.info(
+                "BootstrapPipeline finished successfully "
+                "(dag_run_id=%s, pipeline_run_id=%s, rows_inserted=%s)",
+                dag_run_id,
+                pipeline_run_id,
+                total_inserted,
+            )
             return total_inserted
         except Exception as exc:
+            logger.exception(
+                "BootstrapPipeline failed (dag_run_id=%s, pipeline_run_id=%s)",
+                dag_run_id,
+                pipeline_run_id,
+            )
             if pipeline_run_id is not None:
                 try:
                     self._monitor.finish_failure(pipeline_run_id, str(exc))
                 except Exception:
-                    pass
+                    logger.exception(
+                        "Failed to mark pipeline_run_id=%s as failed",
+                        pipeline_run_id,
+                    )
             raise
 
     def _sync_symbols_from_yaml(self) -> None:
@@ -108,6 +143,8 @@ class BootstrapPipeline:
             (r["exchange"], r["symbol"]): r
             for r in self._fetch_all_configured_symbols()
         }
+        inserted_symbols: list[str] = []
+        refreshed_symbols: list[str] = []
 
         for symbol in self._yaml_symbols:
             key = (EXCHANGE, symbol)
@@ -117,6 +154,7 @@ class BootstrapPipeline:
                     symbol=symbol,
                     history_days=self._history_days,
                 )
+                inserted_symbols.append(symbol)
                 continue
 
             row = existing[key]
@@ -127,6 +165,15 @@ class BootstrapPipeline:
                     symbol,
                     self._history_days,
                 )
+                refreshed_symbols.append(symbol)
+
+        logger.info(
+            "configured_symbols sync complete "
+            "(yaml_count=%s, newly_inserted=%s, history_refreshed=%s)",
+            len(self._yaml_symbols),
+            inserted_symbols,
+            refreshed_symbols,
+        )
 
     def _bootstrap_symbol(
         self,
@@ -137,14 +184,27 @@ class BootstrapPipeline:
         symbol = row["symbol"]
         history_days = int(row["history_days"])
         inserted = 0
+        logger.info(
+            "Bootstrap symbol started (symbol=%s, history_days=%s, status=%s)",
+            symbol,
+            history_days,
+            row.get("bootstrap_status"),
+        )
 
         try:
             self._mark_running(EXCHANGE, symbol)
 
             end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
             start_ms = self._resolve_start_ms(row, history_days, end_ms)
+            logger.info(
+                "Bootstrap window (symbol=%s, start_ms=%s, end_ms=%s)",
+                symbol,
+                start_ms,
+                end_ms,
+            )
 
             current_start = start_ms
+            batches = 0
             while current_start <= end_ms:
                 # Binance hard-limit: at most BINANCE_KLINES_MAX_LIMIT candles per request.
                 batch = self._extractor.extract_klines(
@@ -158,7 +218,16 @@ class BootstrapPipeline:
                     break
 
                 self._data_quality.validate_latest_klines(batch)
-                inserted += self._loader.insert_klines(batch, pipeline_run_id)
+                batch_inserted = self._loader.insert_klines(batch, pipeline_run_id)
+                inserted += batch_inserted
+                batches += 1
+                logger.info(
+                    "Bootstrap batch (symbol=%s, batch=%s, extracted=%s, inserted=%s)",
+                    symbol,
+                    batches,
+                    len(batch),
+                    batch_inserted,
+                )
 
                 last_open = max(int(k["open_time"]) for k in batch)
                 last_open_dt = datetime.fromtimestamp(
@@ -183,9 +252,16 @@ class BootstrapPipeline:
                     break
 
             self._mark_completed(EXCHANGE, symbol)
+            logger.info(
+                "Bootstrap symbol completed (symbol=%s, batches=%s, rows_inserted=%s)",
+                symbol,
+                batches,
+                inserted,
+            )
             return inserted
         except Exception as exc:
             self._mark_failed(EXCHANGE, symbol, str(exc))
+            logger.exception("Bootstrap symbol failed (symbol=%s)", symbol)
             raise
 
     def _resolve_start_ms(
