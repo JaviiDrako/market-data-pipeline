@@ -18,3 +18,4 @@ logs/
 
 # macOS / Linux
 .DS_Store
+dbt/.user.yml
