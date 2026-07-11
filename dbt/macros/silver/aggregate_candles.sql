@@ -36,11 +36,14 @@
             exchange,
             symbol,
             open_time,
-            (array_agg(close_time ORDER BY open_time DESC))[1] AS close_time,
-            (array_agg(open_price ORDER BY open_time ASC))[1] AS open_price,
+            -- Order by close_time (original 1m end), not the bucket open_time:
+            -- after bucketing every row shares the same open_time, so ORDER BY
+            -- open_time is non-deterministic for first open / last close.
+            (array_agg(close_time ORDER BY close_time DESC))[1] AS close_time,
+            (array_agg(open_price ORDER BY close_time ASC))[1] AS open_price,
             max(high_price) AS high_price,
             min(low_price) AS low_price,
-            (array_agg(close_price ORDER BY open_time DESC))[1] AS close_price,
+            (array_agg(close_price ORDER BY close_time DESC))[1] AS close_price,
             sum(volume) AS volume,
             sum(quote_asset_volume) AS quote_asset_volume,
             sum(number_of_trades) AS number_of_trades,
