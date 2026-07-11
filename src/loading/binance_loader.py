@@ -119,7 +119,12 @@ class BinanceLoader:
         records: list[dict[str, Any]],
         pipeline_run_id: int,
     ) -> int:
-        """Insert historical kline records into bronze.binance_klines."""
+        """
+        Insert historical kline records into bronze.binance_klines.
+
+        Returns the number of rows **actually inserted** by PostgreSQL.
+        Rows skipped by ``ON CONFLICT DO NOTHING`` are not counted.
+        """
         if not records:
             return 0
 
@@ -164,8 +169,24 @@ class BinanceLoader:
             for record in records
         ]
 
-        self._execute_many(query, values)
-        return len(records)
+        # Per-row execute so cursor.rowcount reflects inserts vs conflicts.
+        # executemany does not reliably accumulate rowcount with ON CONFLICT.
+        connection = self._database.get_connection()
+        try:
+            inserted = 0
+            with connection.cursor() as cursor:
+                for value in values:
+                    cursor.execute(query, value)
+                    # PostgreSQL: 1 if inserted, 0 if DO NOTHING skipped the row.
+                    if cursor.rowcount and cursor.rowcount > 0:
+                        inserted += cursor.rowcount
+            connection.commit()
+            return inserted
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def _execute_many(self, query: str, values: Iterable[tuple[Any, ...]]) -> None:
         connection = self._database.get_connection()
