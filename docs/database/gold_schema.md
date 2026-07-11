@@ -31,7 +31,6 @@ Gold **Features** consume **exclusively** existing Gold Indicator tables (joined
 Gold **Signals** consume **exclusively** Gold Features + Gold Indicators. Signals are generic boolean/integer flags (not final trade decisions). They provide structured context for the trading bot or ML models. Signals never recalculate anything from lower layers.
 
 Gold **Feature Tables** are the final consolidated layer. They consume exclusively the three previous Gold layers (Indicators + Features + Signals) and produce clean, ready-to-consume datasets containing only keys + features + signals. No recalculation occurs at this layer.
-```
 
 ## Models
 
