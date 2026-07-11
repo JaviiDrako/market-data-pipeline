@@ -25,16 +25,18 @@ It is designed as a clean data foundation for:
 7. [Requirements](#requirements)
 8. [Getting started (from zero)](#getting-started-from-zero)
 9. [Configuration](#configuration)
-10. [How to run the Bootstrap pipeline](#how-to-run-the-bootstrap-pipeline)
-11. [How to run the Incremental pipeline](#how-to-run-the-incremental-pipeline)
-12. [Airflow](#airflow)
-13. [dbt](#dbt)
-14. [PostgreSQL](#postgresql)
-15. [Testing](#testing)
-16. [Branching model](#branching-model)
-17. [Documentation](#documentation)
-18. [Roadmap](#roadmap)
-19. [License](#license)
+10. [Logging](#logging)
+11. [How to run the Bootstrap pipeline](#how-to-run-the-bootstrap-pipeline)
+12. [How to run the Incremental pipeline](#how-to-run-the-incremental-pipeline)
+13. [Airflow](#airflow)
+14. [dbt](#dbt)
+15. [PostgreSQL](#postgresql)
+16. [Testing](#testing)
+17. [CI / GitHub Actions](#ci--github-actions)
+18. [Branching model](#branching-model)
+19. [Documentation](#documentation)
+20. [Roadmap](#roadmap)
+21. [License](#license)
 
 ---
 
@@ -115,6 +117,8 @@ Build a maintainable, auditable and extensible market-data platform that:
 | `bootstrap_market_data` | Manual only | `BootstrapPipeline` → `dbt build` |
 
 Business logic lives in `src/pipelines/` and `dbt/`. DAGs only schedule and invoke those components.
+
+**Diagrams (Mermaid):** [`docs/diagrams/`](docs/diagrams/) — general architecture, incremental flow, bootstrap flow, medallion layers.
 
 Full architecture documentation: [`docs/architecture/`](docs/architecture/).
 
@@ -227,6 +231,9 @@ market-data-pipeline/
 | dbt staging + Silver (1m + multi-TF) | ✅ Implemented |
 | Gold indicators / features / signals / datasets | ✅ Implemented |
 | Unit + integration tests | ✅ Implemented |
+| Centralized Python logging (`get_logger`) | ✅ Implemented |
+| GitHub Actions CI (unit + dbt parse) | ✅ Implemented |
+| Mermaid architecture diagrams | ✅ Implemented |
 | BI / Dashboards | ⏳ Pending |
 | Trading Bot | ⏳ Pending |
 | Machine Learning pipelines | ⏳ Pending |
@@ -355,9 +362,9 @@ python -c "from src.common.database import Database; c=Database().get_connection
 
 Single source of truth: **`src/config/config.yaml`**, loaded by `src.config.settings.Settings`.
 
+Only settings that the project actually uses are present (no empty placeholder sections).
+
 ```yaml
-database:
-quality:
 sources:
   binance:
     symbols:
@@ -375,9 +382,27 @@ sources:
 | `sources.binance.historical.days` | Bootstrap history depth (`Settings.get_history_days`) |
 | `sources.binance.historical.interval` | Bootstrap/kline interval + incremental DAG cron (`Settings.get_pipeline_schedule`) |
 
+Warehouse credentials come from `docker/.env` (and optional `WAREHOUSE_*` / `DBT_*` env vars), not from `config.yaml`.
+
 Supported intervals for Airflow cron mapping: `1m`, `5m`, `15m`, `30m`, `1h`, `1d`.
 
 > For faster local tests, temporarily set `days: 2`. Restore a larger value for production-like history.
+
+---
+
+## Logging
+
+Python components use a shared helper:
+
+```python
+from src.common.logger import get_logger
+
+logger = get_logger(__name__)
+```
+
+- Default level: `INFO` (override with env `LOG_LEVEL`)
+- Integrates with **Airflow task logs** (no duplicate handlers when the root logger is already configured)
+- Emits lifecycle events: pipeline start/finish, extraction counts, inserts, bootstrap symbol progress, validation summaries, errors
 
 ---
 
@@ -565,6 +590,28 @@ Notable tests:
 
 ---
 
+## CI / GitHub Actions
+
+Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
+Runs on **push** and **pull_request** (fast path — no full Docker integration):
+
+1. Checkout
+2. Setup Python 3.11
+3. Install `requirements.txt`
+4. Validate critical imports
+5. **Unit tests** (`tests/unit`)
+6. **dbt parse** (project/manifest validation; no live warehouse required)
+
+```bash
+# Local equivalents
+export PYTHONPATH=.
+python -m unittest discover -s tests/unit -v
+cd dbt && dbt parse --profiles-dir .
+```
+
+---
+
 ## Branching model
 
 | Branch | Purpose |
@@ -589,7 +636,8 @@ Workflow used in this project:
 | Path | Content |
 |------|---------|
 | [`docs/README.md`](docs/README.md) | Full documentation index |
-| [`docs/architecture/`](docs/architecture/) | System, Airflow, Bootstrap, Warehouse, Data Quality |
+| [`docs/architecture/`](docs/architecture/) | System, Airflow, Bootstrap, Warehouse, Data Quality, future improvements |
+| [`docs/diagrams/`](docs/diagrams/) | Mermaid diagrams (architecture, flows, medallion) |
 | [`docs/database/`](docs/database/) | Bronze / Silver / Gold schemas |
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records |
 | [`docs/vision-and-roadmap.md`](docs/vision-and-roadmap.md) | Vision + remaining work |
@@ -607,6 +655,8 @@ Workflow used in this project:
 - Airflow incremental + bootstrap DAGs
 - Pre-load Data Quality and pipeline monitoring
 - Unit and integration test suites
+- Centralized logging and GitHub Actions CI
+- Mermaid architecture diagrams
 
 ### Pending (not implemented — do not treat as available)
 

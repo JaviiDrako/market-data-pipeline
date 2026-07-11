@@ -13,12 +13,14 @@ Documentation evolves with the implementation and records architecture, database
 | Clone and run the project | Root [`README.md`](../README.md) |
 | Understand the full platform vision | [`vision-and-roadmap.md`](vision-and-roadmap.md) |
 | Understand system components | [`architecture/architecture_overview.md`](architecture/architecture_overview.md) |
+| View Mermaid diagrams | [`diagrams/`](diagrams/) |
 | Understand warehouse layers | [`architecture/warehouse_architecture.md`](architecture/warehouse_architecture.md) |
 | Understand historical bootstrap | [`architecture/bootstrap_pipeline.md`](architecture/bootstrap_pipeline.md) |
 | Understand Airflow DAGs | [`architecture/airflow_architecture.md`](architecture/airflow_architecture.md) |
 | Understand pre-load validation | [`architecture/data_quality.md`](architecture/data_quality.md) |
 | Inspect table/model schemas | [`database/`](database/) |
 | Read architectural decisions | [`adr/`](adr/) |
+| Future (deferred) optimizations | [architecture_overview.md § Future Improvements](architecture/architecture_overview.md#future-improvements) |
 
 ---
 
@@ -31,7 +33,7 @@ docs/
 ├── adr/                      # Architecture Decision Records
 ├── architecture/             # System design documents
 ├── database/                 # Physical / logical layer schemas
-└── diagrams/                 # Reserved for additional diagram assets
+└── diagrams/                 # Mermaid architecture & flow diagrams
 ```
 
 ---
@@ -40,7 +42,7 @@ docs/
 
 | Document | Description | Status |
 |----------|-------------|--------|
-| [architecture_overview.md](architecture/architecture_overview.md) | High-level components, pipelines, configuration | Current |
+| [architecture_overview.md](architecture/architecture_overview.md) | High-level components, pipelines, configuration, future improvements | Current |
 | [warehouse_architecture.md](architecture/warehouse_architecture.md) | Medallion warehouse design and data flow | Current |
 | [bootstrap_pipeline.md](architecture/bootstrap_pipeline.md) | Historical kline bootstrap, resume, `configured_symbols` | Current |
 | [airflow_architecture.md](architecture/airflow_architecture.md) | Incremental + Bootstrap DAGs, schedule mapping | Current |
@@ -56,7 +58,22 @@ docs/
 - `configured_symbols` control table
 - Monitoring (`pipeline_runs` / `PipelineMonitor`)
 - Data Quality (`DataQuality`)
+- Logging (`src.common.logger.get_logger`)
 - Testing approach (unit + integration; see root README)
+- CI (GitHub Actions unit tests + dbt parse)
+- Conscious future improvements (dbt selection, concurrency, bulk load)
+
+---
+
+## Diagrams
+
+| Document | Description |
+|----------|-------------|
+| [diagrams/README.md](diagrams/README.md) | Diagram index |
+| [architecture_overview.md](diagrams/architecture_overview.md) | General platform architecture |
+| [incremental_flow.md](diagrams/incremental_flow.md) | Incremental pipeline flow + sequence |
+| [bootstrap_flow.md](diagrams/bootstrap_flow.md) | Bootstrap flow + status machine |
+| [medallion_architecture.md](diagrams/medallion_architecture.md) | Bronze / Silver / Gold products |
 
 ---
 
@@ -97,4 +114,4 @@ docs/
 2. Do **not** document unimplemented features as if they were live.
 3. Update docs in the same sprint as behavioural changes.
 4. Prefer linking to a single source of truth over duplicating long sections.
-5. Diagrams use fenced Markdown code blocks (ASCII / text).
+5. Architecture diagrams use **Mermaid** under [`diagrams/`](diagrams/).
