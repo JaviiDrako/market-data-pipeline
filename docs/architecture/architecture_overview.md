@@ -235,3 +235,37 @@ Both write klines to the same `bronze.binance_klines` table.
 - Medallion Architecture
 - Fail-fast data quality before persistence
 - Incremental processing in dbt (MERGE on natural keys)
+
+---
+
+# Diagrams
+
+Mermaid diagrams (GitHub-renderable):
+
+| Diagram | Path |
+|---------|------|
+| General architecture | [../diagrams/architecture_overview.md](../diagrams/architecture_overview.md) |
+| Incremental flow | [../diagrams/incremental_flow.md](../diagrams/incremental_flow.md) |
+| Bootstrap flow | [../diagrams/bootstrap_flow.md](../diagrams/bootstrap_flow.md) |
+| Medallion layers | [../diagrams/medallion_architecture.md](../diagrams/medallion_architecture.md) |
+
+---
+
+# Future Improvements
+
+The following items are **conscious design deferrals**, not forgotten work.
+They should be revisited when volume, symbol count, or operational needs justify the complexity.
+
+| Area | Future improvement | Why it is deferred today |
+|------|--------------------|--------------------------|
+| **dbt orchestration** | Optimize `dbt build` via **partial model selection** (e.g. Bronze-adjacent Silver on every tick; Gold on a slower cadence or selective `--select`) | Full graph builds keep the pipeline simple and correct for a small symbol set. Partial selection adds scheduling and dependency policy that is unnecessary until build time becomes a bottleneck. |
+| **Airflow concurrency** | Revisit `max_active_runs` (and optionally pools/parallelism) when the **number of symbols grows significantly** | `max_active_runs=1` avoids overlapping MERGE/load races and is the right default for demo and low-cardinality production. Higher concurrency only pays off with careful isolation and rate-limit budgets. |
+| **Bronze bulk load** | Optimize kline inserts with **batch insert / PostgreSQL `COPY`** if historical volume requires it | Per-row insert with accurate `ON CONFLICT` rowcounts prioritizes correctness and resume metrics. Batch/COPY is a measured optimization once bootstrap backfills dominate runtime. |
+
+Related operational themes (also future, not blocking BI work):
+
+- Richer freshness monitoring and alerting
+- Stronger dbt uniqueness / contract tests
+- CI expansion beyond unit tests + `dbt parse` (e.g. scheduled integration)
+
+When implementing any row above, prefer incremental changes that preserve Medallion boundaries and thin Airflow DAGs.
