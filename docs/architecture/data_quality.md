@@ -2,13 +2,13 @@
 
 ## Purpose
 
-The Data Quality layer validates extracted market data before it is persisted into the Bronze layer.
+The Data Quality layer validates extracted market data **before** it is persisted into the Bronze layer.
 
-Its responsibility is to ensure that only structurally valid records are stored inside the Data Warehouse.
+It ensures that only structurally valid records enter the Data Warehouse.
 
-The component does not transform, normalize or enrich data.
+The component does **not** transform, normalize or enrich data. It only validates consistency and raises on failure.
 
-It only validates consistency.
+Implementation: `src/quality/data_quality.py` (`DataQuality` class).
 
 ---
 
@@ -24,7 +24,7 @@ Binance Client
 Binance Extractor
         │
         ▼
-Data Quality
+Data Quality          ← fail-fast gate
         │
         ▼
 Bronze Loader
@@ -33,38 +33,39 @@ Bronze Loader
 Bronze Tables
 ```
 
+Integrated into:
+
+- `BronzePipeline` (price, ticker, latest klines)
+- `BootstrapPipeline` (historical kline batches)
+
 ---
 
 # Responsibilities
 
-The Data Quality layer performs:
+**Does:**
 
 - Structural validation
 - Numeric validation
 - Timestamp validation
-- Basic consistency validation
+- Basic consistency checks (e.g. high ≥ low)
 
-It does not perform:
+**Does not:**
 
-- Data cleaning
-- Data normalization
-- Business transformations
-- Technical indicator calculations
-
-Those responsibilities belong to later pipeline stages.
+- Data cleaning or imputation
+- Normalization (Silver)
+- Business transformations / indicators (Gold)
+- Soft-fail with partial loads for invalid batches
 
 ---
 
 # Validation Strategy
 
-The project follows a fail-fast validation strategy.
+Fail-fast:
 
-If any record is invalid:
-
-1. Validation stops immediately.
+1. Validation stops on the first invalid record (per validation call).
 2. A `DataQualityError` is raised.
-3. The pipeline execution is marked as failed.
-4. No invalid data is inserted into Bronze.
+3. The pipeline marks the run as failed via `PipelineMonitor` when applicable.
+4. No invalid batch is intentionally committed as “good” data.
 
 ---
 
@@ -72,56 +73,54 @@ If any record is invalid:
 
 ## Current Price
 
-- Symbol exists
-- Symbol is not empty
-- Price is numeric
-- Price is greater than zero
-
----
+- Symbol present and non-empty
+- Price numeric and greater than zero
 
 ## 24-Hour Ticker
 
-- Symbol exists
-- Prices are non-negative
-- High price is greater than or equal to low price
-- Volumes are non-negative
-- Trade count is non-negative
-- Open time is before close time
+- Symbol present
+- Prices non-negative; high ≥ low
+- Volumes and trade count non-negative
+- Open time before close time
 
----
+## Klines (latest and historical)
 
-## Latest Klines
-
-- Symbol exists
-- OHLC prices are positive
-- High price is greater than or equal to low price
-- Volumes are non-negative
-- Number of trades is non-negative
-- Open time is before close time
+- Symbol present
+- OHLC prices positive; high ≥ low
+- Volumes and number of trades non-negative
+- Open time before close time
 
 ---
 
 # Error Handling
 
-Validation failures raise a `DataQualityError`.
+Validation failures raise `DataQualityError` (see `src/common/exceptions.py`).
 
-The validation layer never attempts to modify invalid records.
+The validation layer never mutates invalid records. Corrections belong in upstream extraction fixes or explicit future cleaning stages—not silent coercion here.
 
-All corrections, if required in the future, must be implemented outside this component.
+---
+
+# Relationship to dbt Tests
+
+| Layer | When | What |
+|-------|------|------|
+| Python Data Quality | Pre-Bronze insert | Structural sanity of API payloads |
+| dbt tests | Post-transform | Model keys, nullability, uniqueness |
+
+They are complementary, not duplicates.
 
 ---
 
 # Current Status
 
-Implemented:
+**Implemented**
 
-- Current price validation
-- 24-hour ticker validation
-- Latest kline validation
-- Fail-fast validation strategy
+- Current price, 24h ticker and kline validators
+- Fail-fast strategy
+- Integration with Bronze and Bootstrap pipelines
 
-Pending:
+**Pending (not implemented)**
 
-- Integration with the Bronze Pipeline
-- Data quality metrics
-- Validation reports
+- Data quality metrics warehouse / dashboards
+- Soft-quarantine tables for rejected rows
+- Cross-batch anomaly detection (e.g. price spike alerts)

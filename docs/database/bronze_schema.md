@@ -73,9 +73,14 @@ GET /api/v3/klines
 
 ## Purpose
 
-Stores the latest one-minute candlestick received for each configured symbol during every pipeline execution.
+Stores OHLCV candlesticks returned by Binance.
 
-Each record represents one OHLCV candle exactly as returned by Binance.
+Used by:
+
+- **Incremental pipeline** — latest closed candle per symbol per run
+- **Bootstrap pipeline** — historical ranges (up to 1000 candles per API request)
+
+Each record represents one OHLCV candle as returned by Binance (no analytical transformations).
 
 ---
 
@@ -166,14 +171,19 @@ Binance Client
 Binance Extractor
         │
         ▼
-Pipeline Monitor
+Data Quality
         │
         ▼
-Bronze Loader
+Pipeline Monitor + Bronze Loader
         │
         ▼
 Bronze Tables
 ```
+
+Two orchestration entry points write into Bronze:
+
+1. `BronzePipeline` — price + ticker + latest klines  
+2. `BootstrapPipeline` — historical klines + `configured_symbols`
 
 ---
 
@@ -235,14 +245,13 @@ No business relationships exist between market data tables.
 
 Implemented:
 
-- Physical schema
-- PostgreSQL initialization
-- Binance extraction
-- Bronze loading
-- Pipeline execution monitoring
+- Physical schema + PostgreSQL initialization (`docker/postgres/init/`)
+- Binance extraction and Bronze loading
+- Pipeline execution monitoring (`pipeline_runs`)
 - `configured_symbols` operational table
 - Historical bootstrap pipeline (Python)
-
-Pending:
-
 - Airflow DAGs for incremental + bootstrap orchestration
+
+Pending (product consumers, not Bronze schema):
+
+- BI / Trading Bot / ML consumers of downstream layers

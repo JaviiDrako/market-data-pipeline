@@ -2,11 +2,11 @@
 
 ## Purpose
 
-The project uses a PostgreSQL Data Warehouse to centralize market data collected from cryptocurrency exchanges.
+The project uses a **PostgreSQL** Data Warehouse to centralize market data collected from cryptocurrency exchanges.
 
-Instead of querying external APIs directly from analytical applications, all market information is first stored inside the warehouse.
+Analytical applications and future trading / ML systems should query the warehouse rather than external APIs directly.
 
-This approach provides:
+This provides:
 
 - Historical persistence
 - Better query performance
@@ -18,111 +18,104 @@ This approach provides:
 
 # Why a Data Warehouse?
 
-A Data Warehouse separates operational data collection from analytical consumption.
+A warehouse separates operational collection from analytical consumption.
 
-Instead of repeatedly querying external APIs, data is collected once and reused by:
+Data is collected once and reused by:
 
-- BI dashboards
-- Trading algorithms
-- Machine learning models
-- Future analytical services
+- BI dashboards (**pending**)
+- Trading algorithms (**pending**)
+- Machine learning models (**pending**)
+- Ad-hoc SQL analysis (**available today**)
 
 ---
 
 # Medallion Architecture
 
-The warehouse follows the Medallion Architecture.
-
 ```
-Bronze
+Bronze  (raw, provider-specific)
    │
    ▼
-Silver
+Silver  (normalized + multi-timeframe candles)
    │
    ▼
-Gold
+Gold    (indicators → features → signals → feature tables)
 ```
 
-Each layer progressively increases data quality and business value.
+Each layer increases business value and readiness for consumption.
 
 ---
 
 # Bronze Layer
 
-Purpose:
-
-Store raw provider data with minimal transformation.
+**Purpose:** store raw provider data with minimal transformation.
 
 Characteristics:
 
-- Immutable
-- Auditable
-- Provider-specific
-- Historical
+- Immutable inserts (idempotent where needed)
+- Auditable via `pipeline_run_id`
+- Provider-specific table shapes
+- Historical preservation
 
-Examples:
+Tables (Binance):
 
-- binance_klines
-- binance_current_price
-- binance_ticker_24h
+- `bronze.binance_klines`
+- `bronze.binance_price`
+- `bronze.binance_ticker_24h`
+- `bronze.pipeline_runs`
+- `bronze.configured_symbols`
 
-Only structural mapping is performed.
+Only structural mapping is performed. No business indicators.
 
-No business calculations are allowed.
+Details: [../database/bronze_schema.md](../database/bronze_schema.md).
 
 ---
 
 # Silver Layer
 
-Purpose:
-
-Standardize data coming from different providers.
+**Purpose:** standardize and aggregate for analytics.
 
 Responsibilities:
 
-- Standardized column names
-- Type normalization
-- Data validation
-- Provider abstraction
+- Staging views over Bronze
+- Provider-independent column names
+- Canonical 1-minute candles
+- Multi-timeframe OHLCV aggregations (5m, 15m, 30m, 1h, 1d)
+- Market snapshots
 
-The Silver layer removes provider-specific differences while preserving information.
+Details: [../database/silver_schema.md](../database/silver_schema.md).
 
 ---
 
 # Gold Layer
 
-Purpose:
+**Purpose:** persist intelligence datasets ready for consumers.
 
-Provide analytical datasets ready for consumption.
+```
+Silver candles_*
+      → Indicators
+      → Features
+      → Signals
+      → Feature Tables (market_dataset_*)
+```
 
-Examples:
+Gold prioritizes query performance and consumer readiness over pure normalization.
 
-- Technical indicators
-- Aggregated candles
-- Dashboard models
-- Trading datasets
-
-Gold prioritizes query performance over normalization.
+Details: [../database/gold_schema.md](../database/gold_schema.md).
 
 ---
 
 # Why Bronze Tables Are Provider-Specific
 
-The Bronze layer stores provider responses as close as possible to the original API.
-
-For example:
+Bronze stores responses as close as possible to the original API:
 
 ```
 bronze.binance_klines
-
-bronze.yahoo_ohlc
+# future: bronze.yahoo_ohlc, …
 ```
 
-Different providers may expose different fields.
+Different providers expose different fields. Normalization happens in Silver, minimizing data loss and simplifying future integrations.
 
-Instead of forcing an artificial standardization during ingestion, normalization occurs later in the Silver layer.
-
-This design minimizes data loss and simplifies future integrations.
+ADR: [../adr/adr_003_provider-specific_bronze_tables.md](../adr/adr_003_provider-specific_bronze_tables.md).
 
 ---
 
@@ -138,79 +131,85 @@ Binance Client
 Binance Extractor
       │
       ▼
-Bronze Loader
+Data Quality
+      │
+      ▼
+Bronze Loader (+ Pipeline Monitor)
       │
       ▼
 Bronze Tables
       │
       ▼
-dbt
+dbt (staging views)
       │
       ▼
-Silver
+Silver (candles, multi-TF, snapshot)
       │
       ▼
-dbt
-      │
-      ▼
-Gold
+Gold (indicators → features → signals → datasets)
 ```
+
+Two ingestion entry points feed Bronze:
+
+1. **Incremental** — latest market state every schedule tick  
+2. **Bootstrap** — historical klines until `configured_symbols` is `completed`
 
 ---
 
 # Why dbt Is Used
 
-dbt is responsible for all warehouse transformations.
+dbt owns **all** warehouse transformations after Bronze:
 
-Responsibilities include:
-
-- Data cleaning
+- Staging / cleansing
 - Standardization
-- Business transformations
-- Technical indicators
-- Aggregations
+- Multi-timeframe aggregations
+- Technical indicators, features, signals
+- Tests on model contracts
 
-Extraction code never performs analytical transformations.
+Python extraction code never computes analytical indicators.
 
 ---
 
 # Warehouse Relationships
 
-Unlike transactional databases, the warehouse minimizes relational constraints.
+Unlike OLTP systems, the warehouse uses minimal relational constraints.
 
-Primary keys are used for entity identification.
+- Primary keys identify entities (e.g. `(symbol, open_time)` for klines)
+- Physical FKs where operational value is clear (e.g. `pipeline_run_id` → `pipeline_runs`)
+- Most analytical joins are logical (exchange + symbol + open_time)
 
-Physical foreign keys are only applied where they provide operational value.
-
-Relationships are primarily logical and maintained through consistent identifiers.
+ADR: [../adr/adr_005_physical_foreign_keys.md](../adr/adr_005_physical_foreign_keys.md).
 
 ---
 
 # Current Status
 
-Implemented:
+**Implemented**
 
-- PostgreSQL warehouse
-- Bronze schema
-- Bronze table design
+- PostgreSQL 16 warehouse
+- Schemas `bronze`, `silver`, `gold`
+- Full Bronze DDL + loading
+- dbt staging + Silver + Gold models
+- Incremental MERGE strategies on analytical models
 
-Pending:
+**Pending (downstream products)**
 
-- Bronze loading
-- Silver models
-- Gold models
-- dbt transformations
-- Analytical indicators
+- BI semantic layers / dashboards
+- Trading bot read models beyond SQL
+- ML training pipelines
+- Additional provider Bronze tables
 
 ---
 
 # Future Evolution
 
-The warehouse has been designed to support:
+The warehouse is designed to support:
 
 - Additional exchanges
-- Multiple asset classes
-- Additional analytical models
+- More asset classes
+- Richer analytical models
+- BI dashboards
 - Trading strategies
-- Business Intelligence dashboards
 - Machine Learning pipelines
+
+Those consumers are **not** implemented in the current repository.

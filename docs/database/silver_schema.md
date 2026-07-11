@@ -67,13 +67,18 @@ Incremental models significantly reduce execution time and resource consumption 
 # Current Models
 
 ```
-silver/
+silver/   (schema: silver; staging models live under dbt/models/staging)
 
 ├── stg_binance_price (View)
 ├── stg_binance_ticker_24h (View)
 ├── stg_binance_klines (View)
 ├── market_snapshot (Incremental Table)
-└── market_candles (Incremental Table)
+├── market_candles (Incremental Table — canonical 1m)
+├── market_candles_5m (Incremental Table)
+├── market_candles_15m (Incremental Table)
+├── market_candles_30m (Incremental Table)
+├── market_candles_1h (Incremental Table)
+└── market_candles_1d (Incremental Table)
 ```
 
 ---
@@ -311,17 +316,19 @@ This approach minimizes execution time while preserving the complete historical 
 
 Implemented
 
-- dbt Project
-- PostgreSQL Profile
-- Source Definitions
-- Staging Views
-- Incremental Silver Models
-- End-to-End Pipeline Test (integration)
-- Schema Generation Macro
+- dbt project + profiles
+- Source definitions
+- Staging views
+- Incremental `market_candles` and `market_snapshot`
+- Multi-timeframe aggregations (`5m`, `15m`, `30m`, `1h`, `1d`)
+- Aggregation macros (`aggregate_candles`, `candle_attributes`)
+- Integration tests (E2E + deterministic 1m→5m aggregation)
 
-Pending
+Downstream (outside Silver, already implemented elsewhere)
 
-- Multi-timeframe Aggregations
-- Gold Layer
-- Technical Indicators
-- Airflow Orchestration
+- Gold indicators / features / signals / feature tables — see [gold_schema.md](gold_schema.md)
+- Airflow orchestration — see [../architecture/airflow_architecture.md](../architecture/airflow_architecture.md)
+
+Pending product consumers
+
+- BI dashboards, Trading Bot, ML pipelines

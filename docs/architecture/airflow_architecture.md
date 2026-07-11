@@ -16,7 +16,7 @@ All business logic remains in `src/pipelines/` and `dbt/`.
 
 ---
 
-## Two DAGs
+## Two DAGs (current mainline)
 
 | | Incremental | Bootstrap |
 |--|-------------|-----------|
@@ -32,6 +32,8 @@ All business logic remains in `src/pipelines/` and `dbt/`.
 | **retries** | `1` (delay 2 min) | `1` (delay 2 min) |
 
 Both DAGs are independent. Running one does not replace the other.
+
+> A daily **maintenance** DAG is **not** part of the current `develop` baseline. Do not assume it exists unless merged from a feature branch.
 
 ---
 
@@ -201,3 +203,14 @@ Confirm tasks end in **success** for both DAGs.
 | `max_active_runs=1` | Avoid concurrent heavy loads / merges |
 | Logging (not print) | Airflow task logs only |
 | No SQL / no business logic in DAGs | All logic in `src/pipelines` and dbt |
+| Shared `AIRFLOW__WEBSERVER__SECRET_KEY` + `airflow_logs` volume | Webserver can serve scheduler task logs without 403s |
+
+---
+
+## Out of scope / pending orchestration
+
+Not implemented on the current mainline:
+
+- Daily maintenance / data-quality ops DAG
+- Separate DQ-only or monitoring-only DAGs
+- Multi-environment deployment topologies beyond local Docker Compose

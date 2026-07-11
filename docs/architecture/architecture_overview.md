@@ -2,11 +2,11 @@
 
 ## Purpose
 
-The Market Data Pipeline is a production-oriented ELT platform designed to ingest, process and serve cryptocurrency market data.
+The Market Data Pipeline is a production-oriented ELT platform that ingests, validates, transforms and serves cryptocurrency market data.
 
-The architecture follows a layered approach where every component has a single responsibility. Raw market data is collected from external providers, stored inside a PostgreSQL Data Warehouse, transformed using dbt and finally consumed by Business Intelligence tools and trading systems.
+Every component has a single responsibility. Raw market data is collected from external providers, stored in a PostgreSQL Data Warehouse, transformed with dbt under a Medallion layout, and prepared for future BI, trading and ML consumers.
 
-The project has been designed to support additional market data providers without requiring major architectural changes.
+The design supports additional market data providers without major architectural rewrites.
 
 ---
 
@@ -18,13 +18,16 @@ The project has been designed to support additional market data providers withou
              ┌─────────────────┴─────────────────┐
              │                                   │
          Binance API                      Future Providers
-                                              (Yahoo, etc.)
+                                              (pending)
              │
              ▼
       Market Data Client
              │
              ▼
      Market Data Extractor
+             │
+             ▼
+        Data Quality
              │
      ┌───────┴────────┐
      ▼                ▼
@@ -33,31 +36,29 @@ The project has been designed to support additional market data providers withou
      │                │
      └───────┬────────┘
              ▼
-        Bronze Loader
+        Bronze Loader + Pipeline Monitor
              │
              ▼
-     PostgreSQL Warehouse
+     PostgreSQL Warehouse (bronze.*)
+             │
+        Airflow DAGs
+     (schedule / trigger)
+             │
+             ▼
+          dbt build
              │
      ┌───────┴────────┐
      ▼                ▼
- Bronze            Airflow Metadata
- (configured_symbols)
-     │
-     ▼
-    dbt
-     │
-     ▼
- Silver
-     │
-     ▼
-    dbt
-     │
-     ▼
- Gold
-     │
- ┌───┴───────────────┐
- ▼                   ▼
-BI Dashboards    Trading Bot
+ Silver            Gold
+ (staging,         (indicators →
+  candles,          features →
+  multi-TF)         signals →
+                    feature tables)
+             │
+     ┌───────┼───────────────┐
+     ▼       ▼               ▼
+    BI   Trading Bot        ML
+ (pending) (pending)     (pending)
 ```
 
 ---
@@ -68,147 +69,169 @@ BI Dashboards    Trading Bot
 
 External APIs providing market information.
 
-Current implementation:
+**Current:** Binance REST API
 
-- Binance REST API
-
-Future providers may include:
-
-- Yahoo Finance
-- Coinbase
-- Kraken
-- Polygon
-- Alpha Vantage
+**Pending:** Yahoo Finance, Coinbase, Kraken, Polygon, etc.
 
 ---
 
-## Client Layer
+## Client Layer (`src/clients/`)
 
-The Client layer is responsible for communicating with external providers.
+Communicates with external providers.
 
-Responsibilities:
+- Build HTTP requests
+- Execute REST calls with retries (`tenacity`)
+- Handle network errors
+- Return raw JSON
 
-- Build HTTP requests.
-- Execute REST API calls.
-- Handle network errors.
-- Return raw JSON responses.
-
-Clients do not perform transformations or business logic.
+Clients do not transform or persist data.
 
 ---
 
-## Extraction Layer
+## Extraction Layer (`src/extraction/`)
 
-The Extraction layer converts provider-specific JSON responses into a standardized Python representation.
+Maps provider JSON into standardized Python dictionaries.
 
-Responsibilities:
+- Read symbols from `Settings` / `config.yaml`
+- Request market data per symbol
+- Expose a shared `MarketDataExtractor` contract
 
-- Read project configuration.
-- Iterate configured symbols.
-- Request market data.
-- Map JSON responses into Python dictionaries.
-
-The extractor is independent of storage.
+Used by both **Bronze** (latest) and **Bootstrap** (historical range) pipelines.
 
 ---
 
-## Loading Layer
+## Data Quality Layer (`src/quality/`)
 
-The Loader receives extracted data and persists it into the Bronze layer.
+Fail-fast structural validation **before** Bronze insert.
 
-Responsibilities:
+See [data_quality.md](data_quality.md).
 
-- Insert records.
-- Manage database transactions.
-- Register pipeline executions.
-- Handle loading failures.
+---
 
-(Currently under development.)
+## Loading Layer (`src/loading/`)
+
+Persists validated records into Bronze tables.
+
+- Insert with idempotent conflict handling where applicable (`ON CONFLICT DO NOTHING` for klines)
+- Associate rows with `pipeline_run_id`
+- Return real inserted row counts
+
+---
+
+## Monitoring (`src/monitoring/`)
+
+Records pipeline executions in `bronze.pipeline_runs`:
+
+- `dag_run_id`, start/finish timestamps
+- status (`running` / `success` / `failed`)
+- rows inserted / updated
+- error message on failure
+
+---
+
+## Pipelines (`src/pipelines/`)
+
+| Pipeline | Class | Role |
+|----------|-------|------|
+| Incremental Bronze | `BronzePipeline` | Latest price + ticker + 1m kline → Bronze |
+| Historical Bootstrap | `BootstrapPipeline` | Full kline history → Bronze + `configured_symbols` state |
+
+Neither pipeline runs dbt. Orchestration layers (Airflow or manual CLI) invoke `dbt build` after a successful pipeline run.
 
 ---
 
 ## Bronze Layer
 
-Stores immutable raw market data.
-
-Characteristics:
-
-- One table per provider endpoint.
-- No business calculations.
-- Historical preservation.
-- Complete auditability.
+Raw, provider-specific, auditable storage. See [warehouse_architecture.md](warehouse_architecture.md) and [../database/bronze_schema.md](../database/bronze_schema.md).
 
 ---
 
 ## Silver Layer
 
-Stores standardized and validated datasets.
-
-Responsibilities:
-
-- Data cleansing.
-- Standardized naming.
-- Type normalization.
-- Cross-provider consistency.
+Standardized, provider-independent models and multi-timeframe aggregations. See [../database/silver_schema.md](../database/silver_schema.md).
 
 ---
 
 ## Gold Layer
 
-Contains business-oriented analytical models.
+Persisted analytical intelligence: indicators, features, signals, feature tables. See [../database/gold_schema.md](../database/gold_schema.md).
 
-Examples:
+---
 
-- Technical indicators.
-- Aggregated OHLC candles.
-- Trading signals.
-- Dashboard-ready datasets.
+## Orchestration (Airflow)
+
+DAGs under `airflow/dags/` schedule or trigger pipelines and `dbt build`.
+
+| DAG | Schedule |
+|-----|----------|
+| `incremental_market_data` | From `config.yaml` interval → cron |
+| `bootstrap_market_data` | Manual only |
+
+See [airflow_architecture.md](airflow_architecture.md).
 
 ---
 
 # Configuration
 
-Project behavior is configuration-driven.
+Behaviour is configuration-driven via `src/config/config.yaml` and `Settings`:
 
-Configuration currently includes:
+| Method | Source key | Used by |
+|--------|------------|---------|
+| `get_symbols(source)` | `sources.<source>.symbols` | Extractors, bootstrap sync |
+| `get_history_days(source)` | `sources.<source>.historical.days` | Bootstrap depth |
+| `get_history_interval(source)` | `sources.<source>.historical.interval` | Kline interval |
+| `get_pipeline_schedule(source)` | same interval → cron | Incremental Airflow DAG |
 
-- Market symbols
-- Historical extraction settings
-- Provider configuration
+Database connection defaults come from `docker/.env` and optional `WAREHOUSE_HOST` / `WAREHOUSE_PORT` overrides (Airflow network).
 
-The architecture allows adding new providers without modifying the extraction workflow.
+---
+
+# Incremental vs Bootstrap
+
+| | Incremental | Bootstrap |
+|--|-------------|-----------|
+| Entry point | `BronzePipeline` | `BootstrapPipeline` |
+| Price / 24h ticker | Yes | No |
+| Klines | Latest closed candle (`limit=1`) | History in blocks of 1000 |
+| Control table | — | `configured_symbols` |
+| Typical trigger | Scheduled Airflow DAG | Manual Airflow / CLI once per env |
+| Then | `dbt build` | `dbt build` |
+
+Both write klines to the same `bronze.binance_klines` table.
 
 ---
 
 # Current Implementation Status
 
-Implemented:
+**Implemented**
 
-- Docker infrastructure
-- PostgreSQL warehouse
-- Bronze physical schema
-- Binance REST client
-- Binance extractor
+- Docker infrastructure (Postgres + Airflow)
+- PostgreSQL warehouse + Bronze DDL
+- Binance client & extractor
+- Data Quality + Bronze Loader + Pipeline Monitor
+- Bronze incremental pipeline
+- Bootstrap historical pipeline + `configured_symbols`
+- Settings-driven symbols / history / schedule
+- dbt staging, Silver (incl. multi-TF), Gold (indicators → datasets)
+- Airflow incremental + bootstrap DAGs
+- Unit and integration tests
 
-Pending:
+**Pending (not in this repository as product features)**
 
-- Bronze Loader
-- Airflow DAGs
-- dbt transformations
-- Silver layer
-- Gold layer
-- BI dashboard
+- BI dashboards
 - Trading bot
+- Machine Learning pipelines
+- Additional providers
+- Mainline maintenance / ops DAG
 
 ---
 
 # Design Principles
 
-The project follows the following engineering principles:
-
 - Single Responsibility Principle
-- Separation of Concerns
-- Configuration over Hardcoding
-- Extensibility
-- Layered Architecture
+- Separation of Concerns (orchestration ≠ business logic)
+- Configuration over hardcoding
+- Extensibility for new providers
 - Medallion Architecture
+- Fail-fast data quality before persistence
+- Incremental processing in dbt (MERGE on natural keys)

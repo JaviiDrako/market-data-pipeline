@@ -4,12 +4,11 @@
 
 The Bootstrap Pipeline performs a **one-time (or resumable) historical load of klines** into Bronze for every configured trading symbol.
 
-It is independent of:
+It is independent of the incremental Bronze path (price / ticker / latest candle).
 
-- Airflow DAGs (orchestration comes in a later sprint)
-- dbt (Silver/Gold transformations are not part of bootstrap completion)
+`bootstrap_status = completed` means: historical klines for that symbol are fully present in `bronze.binance_klines` for the configured history depth.
 
-`bootstrap_status = completed` means: historical klines for that symbol are fully present in `bronze.binance_klines`.
+After a successful bootstrap run, **Airflow** (or a manual operator) typically runs `dbt build` so Silver/Gold catch up. dbt is **not** embedded inside `BootstrapPipeline` itself.
 
 ---
 
@@ -19,15 +18,19 @@ It is independent of:
 |----------|----------|
 | Klines (OHLCV) only | Current price |
 | `bronze.binance_klines` | 24h ticker |
-| Symbol control via `bronze.configured_symbols` | Automatic dbt runs |
-| Resume from last progress | Trading decisions |
+| Symbol control via `bronze.configured_symbols` | Trading decisions |
+| Resume from last progress | Automatic schedule (manual / intentional trigger) |
+| History depth from `Settings` / `config.yaml` | Business indicators (Gold) |
 
 ---
 
 ## Architecture
 
 ```
-config.yaml (symbols + history days)
+config.yaml (symbols + historical.days / interval)
+        │
+        ▼
+Settings.get_symbols / get_history_days / get_history_interval
         │
         ▼
 BootstrapPipeline
@@ -43,7 +46,7 @@ BootstrapPipeline
         │         )
         │              │  (blocks of max 1000 — Binance API limit)
         │              ▼
-        │         BinanceLoader → bronze.binance_klines
+        │         Data Quality → BinanceLoader → bronze.binance_klines
         │              │
         │              ▼ update last_bootstrap_open_time
         │              │
@@ -58,23 +61,47 @@ Both pipelines use the same `MarketDataExtractor` interface.
 
 ---
 
+## Configuration (Settings / config.yaml)
+
+```yaml
+sources:
+  binance:
+    symbols:
+      - BTCUSDT
+      - ETHUSDT
+      - SOLUSDT
+    historical:
+      interval: 1m    # kline interval
+      days: 100       # history depth for bootstrap
+```
+
+| Settings API | Meaning |
+|--------------|---------|
+| `get_symbols("binance")` | Symbols to sync into `configured_symbols` |
+| `get_history_days("binance")` | Depth in days |
+| `get_history_interval("binance")` | Candle interval string |
+
+No bootstrap depth is hard-coded in the pipeline class beyond defaults inside `Settings.get_historical`.
+
+---
+
 ## Responsibilities
 
 | Component | Responsibility |
 |-----------|----------------|
 | `MarketDataExtractor` | Shared extract contract |
-| `BinanceExtractor.extract_klines` | Single reusable kline extract (with optional date range) |
+| `BinanceExtractor.extract_klines` | Single reusable kline extract (optional date range) |
 | `BootstrapPipeline` | Symbol sync, status machine, pagination, resume |
-| `BinanceLoader` | Persist klines into Bronze (`ON CONFLICT DO NOTHING`) |
+| `DataQuality` | Validate each batch before load |
+| `BinanceLoader` | Persist klines (`ON CONFLICT DO NOTHING`) |
 | `configured_symbols` | Per-symbol bootstrap state and progress |
+| `PipelineMonitor` | `pipeline_runs` audit row |
 
 ---
 
 ## Historical download flow
 
 Binance `GET /api/v3/klines` returns **at most 1000 candles per request** (`BINANCE_KLINES_MAX_LIMIT`).
-
-The bootstrap **never** assumes a single request returns the full history.
 
 ```
 current_start
@@ -98,7 +125,7 @@ After each successful block insert, `last_bootstrap_open_time` is updated.
 
 If the process crashes or marks `failed`:
 
-1. Next run loads the same symbol again (status `failed` / `running` / `pending`).
+1. Next run loads the same symbol again (`failed` / `running` / `pending`).
 2. Start time becomes `last_bootstrap_open_time + 1 ms`.
 3. Already loaded candles are not re-downloaded from the beginning.
 4. Duplicate PKs are ignored via PostgreSQL `ON CONFLICT (symbol, open_time) DO NOTHING`.
@@ -115,7 +142,7 @@ YAML new symbol
    RUNNING  ← bootstrap starts
       ↓
   COMPLETED  (success)
-      ↓
+   or
    FAILED    (exception; last_error set; resume later)
 ```
 
@@ -123,42 +150,31 @@ YAML new symbol
 
 ## How to add new symbols
 
-1. Edit `src/config/config.yaml`:
-
-```yaml
-sources:
-  binance:
-    symbols:
-      - BTCUSDT
-      - ETHUSDT
-      - SOLUSDT
-      - NEWUSDT   # add here
-    historical:
-      interval: 1m
-      days: 365
-```
-
-2. Run the Bootstrap Pipeline (see below).
-
-3. The pipeline will:
-
-   - Detect `NEWUSDT` is missing from `configured_symbols`
-   - Insert it as `pending` with `history_days` from YAML
-   - Download history and mark `completed`
+1. Edit `src/config/config.yaml` and add the symbol under `sources.binance.symbols`.
+2. Run the Bootstrap Pipeline (Airflow DAG or Python).
+3. The pipeline inserts the symbol as `pending` with `history_days` from YAML and downloads history until `completed`.
 
 No manual SQL is required for normal operation.
 
 ---
 
-## How to run the Bootstrap Pipeline manually
+## How to run
 
-Prerequisites:
+### Airflow (recommended — includes dbt)
 
-- Docker stack up (`docker compose up -d`)
-- Warehouse reachable (default `localhost:5433`)
-- Project venv with dependencies installed
+```bash
+docker exec market_data_airflow_scheduler \
+  airflow dags unpause bootstrap_market_data
 
-From the project root:
+docker exec market_data_airflow_scheduler \
+  airflow dags trigger bootstrap_market_data
+```
+
+UI: http://localhost:8080 → `bootstrap_market_data` → Trigger.
+
+DAG details: [airflow_architecture.md](airflow_architecture.md).
+
+### Python only (Bronze history; run dbt separately)
 
 ```bash
 source .venv/bin/activate
@@ -174,7 +190,7 @@ print(f'Bootstrap finished. Rows submitted: {rows}')
 "
 ```
 
-Check status:
+### Check status
 
 ```sql
 SELECT exchange, symbol, bootstrap_status, last_bootstrap_open_time, last_error
@@ -191,6 +207,7 @@ ORDER BY symbol;
 | Entry | `BronzePipeline` | `BootstrapPipeline` |
 | Klines | Latest only (`limit=1`) | Full history (blocks of 1000) |
 | Price / Ticker | Yes | No |
-| Typical schedule | Frequent (Airflow later) | Once per symbol (or resume) |
+| Typical schedule | Airflow cron from `interval` | Manual / intentional |
+| Airflow DAG | `incremental_market_data` | `bootstrap_market_data` |
 
 Both write to the same `bronze.binance_klines` table.
