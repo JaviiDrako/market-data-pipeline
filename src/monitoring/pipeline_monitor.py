@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from src.common.database import Database
+from src.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class PipelineMonitor:
@@ -41,7 +44,13 @@ class PipelineMonitor:
         if pipeline_run_id is None:
             raise RuntimeError("Failed to create pipeline run.")
 
-        return int(pipeline_run_id[0])
+        run_id = int(pipeline_run_id[0])
+        logger.info(
+            "Pipeline run started (dag_run_id=%s, pipeline_run_id=%s)",
+            dag_run_id,
+            run_id,
+        )
+        return run_id
 
     def finish_success(
         self,
@@ -68,6 +77,12 @@ class PipelineMonitor:
                 pipeline_run_id,
             ),
         )
+        logger.info(
+            "Pipeline run succeeded (pipeline_run_id=%s, rows_inserted=%s, rows_updated=%s)",
+            pipeline_run_id,
+            rows_inserted,
+            rows_updated,
+        )
 
     def finish_failure(
         self,
@@ -90,6 +105,11 @@ class PipelineMonitor:
                 error_message,
                 pipeline_run_id,
             ),
+        )
+        logger.error(
+            "Pipeline run failed (pipeline_run_id=%s, error=%s)",
+            pipeline_run_id,
+            error_message,
         )
 
     def _execute_update(self, query: str, params: tuple[object, ...]) -> None:

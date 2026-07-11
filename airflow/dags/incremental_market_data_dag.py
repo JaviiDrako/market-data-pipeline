@@ -16,7 +16,6 @@ Schedule is derived from config.yaml via Settings:
 
 from __future__ import annotations
 
-import logging
 import os
 import subprocess
 import sys
@@ -26,8 +25,6 @@ from pathlib import Path
 from airflow.decorators import dag, task
 from airflow.operators.empty import EmptyOperator
 
-logger = logging.getLogger(__name__)
-
 # ---------------------------------------------------------------------------
 # Project path (Airflow containers mount the repo at PROJECT_ROOT)
 # ---------------------------------------------------------------------------
@@ -36,7 +33,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.common.interval_cron import interval_to_cron  # noqa: E402
+from src.common.logger import get_logger  # noqa: E402
 from src.config.settings import Settings  # noqa: E402
+
+logger = get_logger(__name__)
 
 SOURCE_NAME = "binance"
 

@@ -16,7 +16,6 @@ Unlike the incremental DAG, this one has **no schedule**
 
 from __future__ import annotations
 
-import logging
 import os
 import subprocess
 import sys
@@ -26,14 +25,16 @@ from pathlib import Path
 from airflow.decorators import dag, task
 from airflow.operators.empty import EmptyOperator
 
-logger = logging.getLogger(__name__)
-
 # ---------------------------------------------------------------------------
 # Project path (Airflow containers mount the repo at PROJECT_ROOT)
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "/opt/airflow/project"))
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.common.logger import get_logger  # noqa: E402
+
+logger = get_logger(__name__)
 
 default_args = {
     "owner": "market-data",

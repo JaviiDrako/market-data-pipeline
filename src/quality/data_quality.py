@@ -5,6 +5,9 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from src.common.exceptions import DataQualityError
+from src.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class DataQuality:
@@ -12,6 +15,7 @@ class DataQuality:
 
     def validate_current_prices(self, records: list[dict[str, Any]]) -> None:
         """Validate extracted current price records."""
+        logger.info("Validating current prices (records=%s)", len(records))
         for index, record in enumerate(records):
             self._require_symbol(record, index)
             price = self._require_decimal(record, "price", index)
@@ -19,9 +23,11 @@ class DataQuality:
                 raise DataQualityError(
                     f"Invalid current price at index {index}: price must be greater than 0."
                 )
+        logger.info("Current price validation passed (records=%s)", len(records))
 
     def validate_ticker_24h(self, records: list[dict[str, Any]]) -> None:
         """Validate extracted 24-hour ticker records."""
+        logger.info("Validating 24h tickers (records=%s)", len(records))
         for index, record in enumerate(records):
             self._require_symbol(record, index)
 
@@ -78,9 +84,11 @@ class DataQuality:
                 raise DataQualityError(
                     f"Invalid ticker_24h record at index {index}: open_time must be earlier than close_time."
                 )
+        logger.info("24h ticker validation passed (records=%s)", len(records))
 
     def validate_latest_klines(self, records: list[dict[str, Any]]) -> None:
         """Validate extracted latest kline records."""
+        logger.info("Validating klines (records=%s)", len(records))
         for index, record in enumerate(records):
             self._require_symbol(record, index)
 
@@ -148,6 +156,7 @@ class DataQuality:
                 raise DataQualityError(
                     f"Invalid kline record at index {index}: open_time must be earlier than close_time."
                 )
+        logger.info("Kline validation passed (records=%s)", len(records))
 
     def _require_symbol(self, record: dict[str, Any], index: int) -> str:
         symbol = record.get("symbol")
