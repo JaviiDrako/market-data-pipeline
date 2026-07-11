@@ -1,419 +1,199 @@
-# Market Data Pipeline – Project Vision and Remaining Roadmap
+# Market Data Pipeline – Project Vision and Roadmap
 
 ## Project Vision
 
-The objective of this project is to build a production-oriented ELT pipeline capable of collecting, validating, transforming and serving cryptocurrency market data for two different consumers:
+Build a production-oriented ELT platform that collects, validates, transforms and serves cryptocurrency market data for two primary future consumers:
 
-### 1. Business Intelligence
+### 1. Business Intelligence (pending)
 
-The pipeline should provide clean and structured datasets that allow analysts to explore market behavior through dashboards and reports.
+Clean, historical, analytics-ready datasets for dashboards and reports:
 
-Examples include:
-
-* Market evolution
-* Trading volume analysis
-* Price trends
-* Historical comparisons
-* Exchange activity
-* Market statistics
+- Market evolution and price trends
+- Volume analysis and exchange activity
+- Historical comparisons and market statistics
 
 The BI layer prioritizes readability, historical completeness and analytical flexibility.
 
----
+### 2. Algorithmic Trading System (pending)
 
-### 2. Algorithmic Trading System
+An automated trading bot should **consume pre-computed datasets**, not recalculate indicators on every decision cycle.
 
-The second consumer is an automated trading bot.
+The bot should eventually query:
 
-Unlike BI, the trading bot requires low-latency access to prepared market information.
+- Multi-timeframe candles (Silver)
+- Technical indicators (Gold)
+- Trading signals (Gold)
+- Feature datasets / feature tables (Gold)
 
-The objective is **not** to calculate indicators on demand every time the bot executes.
+The pipeline therefore acts as a **market data platform**, not only a passive warehouse.
 
-Instead, the pipeline should continuously prepare and persist market information so the trading bot only needs to query already-computed datasets.
+### 3. Machine Learning (pending)
 
-This architecture reduces computation during trading and allows strategies to execute quickly.
-
-The bot should eventually consume:
-
-* Multi-timeframe candles
-* Technical indicators
-* Trading signals
-* Feature datasets
-* Strategy-specific analytical tables
-
-The pipeline therefore acts as a market data platform rather than only a data warehouse.
+Feature tables (`gold.market_dataset_*`) are designed to support future ML training, backtesting and experimentation. No ML training pipeline is implemented in this repository.
 
 ---
 
-# Current Architecture
+# What is implemented today
 
-The project currently implements the following layers.
+The platform already covers the full ELT path from Binance API to Gold feature tables, with orchestration and tests.
 
-## Bronze Layer
-
-Implemented.
+## Bronze Layer — ✅ Implemented
 
 Responsibilities:
 
-* Extract raw Binance REST API data.
-* Validate extracted records.
-* Store provider-specific raw datasets.
-* Preserve complete historical information.
-* Audit every pipeline execution.
+- Extract raw Binance REST data (price, 24h ticker, klines)
+- Validate extracted records (Data Quality)
+- Persist provider-specific raw tables
+- Audit every execution (`pipeline_runs`)
+- Control historical bootstrap (`configured_symbols`)
 
-Current datasets:
+Components:
 
-* Current Price
-* 24-hour Ticker
-* Latest 1-minute Candles
+- `BinanceClient`, `BinanceExtractor`
+- `DataQuality`
+- `BinanceLoader`
+- `PipelineMonitor`
+- `BronzePipeline` (incremental)
+- `BootstrapPipeline` (historical klines)
 
-Supporting components:
-
-* Binance Client
-* Binance Extractor
-* Data Quality
-* Bronze Loader
-* Pipeline Monitor
-* Bronze Pipeline
-
----
-
-## Silver Layer
-
-Implemented.
+## Silver Layer — ✅ Implemented
 
 Responsibilities:
 
-* Normalize Bronze datasets.
-* Create provider-independent models.
-* Standardize naming conventions.
-* Persist canonical market datasets.
-* Build reusable analytical datasets.
+- Normalize Bronze via staging views
+- Persist canonical 1-minute candles
+- Build multi-timeframe OHLCV aggregations incrementally
+- Persist market snapshots
 
-Current models:
+Models:
 
-Staging Views
+| Model | Role |
+|-------|------|
+| `stg_binance_price` | Staging view |
+| `stg_binance_ticker_24h` | Staging view |
+| `stg_binance_klines` | Staging view |
+| `market_candles` | Canonical 1m candles |
+| `market_candles_5m` / `_15m` / `_30m` / `_1h` / `_1d` | Aggregated timeframes |
+| `market_snapshot` | Price + 24h stats snapshot |
 
-* stg_binance_price
-* stg_binance_ticker_24h
-* stg_binance_klines
+## Gold Layer — ✅ Implemented
 
-Incremental Models
+Intelligence layer optimized for consumption (not normalization).
 
-* market_snapshot
-* market_candles
+```
+market_candles_*
+      → market_indicators_*
+      → market_features_*
+      → market_signals_*
+      → market_dataset_*     ← primary consumable tables
+```
 
-Current canonical timeframe:
+Includes:
 
-* 1 minute
+- Technical indicators (EMA, SMA, RSI, MACD, ATR, Bollinger, …)
+- Trading features (trend, momentum, volatility, price action)
+- Generic signals (alignment, RSI zones, MACD crosses, breakouts, …)
+- Feature tables (keys + features + signals only)
 
-Silver currently represents the clean operational layer from which downstream models will be generated.
+## Bootstrap Pipeline — ✅ Implemented
 
----
+- Historical klines only (blocks of 1000 — Binance API limit)
+- Config-driven symbols and depth (`Settings` / `config.yaml`)
+- Resume via `last_bootstrap_open_time`
+- Status machine on `configured_symbols`
+- Independent of the incremental Bronze path
 
-# Remaining Silver Development
+## Airflow Orchestration — ✅ Implemented (two DAGs)
 
-Although the Silver layer is functional, several important capabilities remain.
+| DAG | Schedule | Flow |
+|-----|----------|------|
+| `incremental_market_data` | From `config.yaml` interval → cron | `BronzePipeline` → `dbt build` |
+| `bootstrap_market_data` | Manual | `BootstrapPipeline` → `dbt build` |
 
-## Multi-Timeframe Aggregations
+## Testing — ✅ Implemented
 
-The canonical 1-minute candles should become the source for larger timeframes.
+| Type | Location | Examples |
+|------|----------|----------|
+| Unit | `tests/unit/` | Extractor, bootstrap helpers, interval→cron |
+| Integration | `tests/integration/` | E2E pipeline, bootstrap, 1m→5m aggregation |
+| dbt tests | `dbt/models/**/*.yml` | not_null / uniqueness on keys where defined |
 
-Rather than recalculating candles every time they are requested, the pipeline should continuously build aggregated candles.
+## Monitoring — ✅ Implemented (pipeline-level)
 
-Initially supported timeframes:
+- `bronze.pipeline_runs` records start/finish, status, row counts, errors
+- Used by both incremental and bootstrap pipelines
 
-* 5 minutes
-* 15 minutes
-* 1 hour
-* 4 hours
-* 1 day
+## Data Quality — ✅ Implemented (pre-Bronze)
 
-Each timeframe should become its own incremental dbt model.
+- Fail-fast structural validation before load
+- Integrated into `BronzePipeline` and bootstrap kline path
 
-Examples:
+## Documentation — ✅ This sprint
 
-* market_candles_5m
-* market_candles_15m
-* market_candles_1h
-* market_candles_4h
-* market_candles_1d
-
-Each model should correctly aggregate:
-
-* Open
-* High
-* Low
-* Close
-* Volume
-* Quote Volume
-* Number of Trades
-* Buy Volumes
-
-These datasets will become the primary source for Gold.
-
----
-
-## Incremental Aggregations
-
-Aggregated candles should not be rebuilt from the entire historical dataset.
-
-dbt incremental models should process only newly available 1-minute candles.
-
-The aggregation strategy should be efficient enough to support continuous pipeline execution.
+- Root README suitable for clone-and-run onboarding
+- Architecture, database and ADR index aligned with implementation
 
 ---
 
-# Gold Layer
+# What is NOT implemented (pending)
 
-Gold represents the intelligence layer of the platform.
+Do **not** document or demo these as if they were live.
 
-Unlike Silver, Gold should not focus on normalization.
-
-Gold should prepare datasets specifically optimized for downstream consumers.
-
-The primary consumer is the trading bot.
-
----
-
-## Technical Indicators
-
-Indicators should be calculated separately for every supported timeframe.
-
-Examples include:
-
-* RSI
-* EMA
-* SMA
-* MACD
-* ATR
-* Bollinger Bands
-* VWAP
-* ADX
-
-Each indicator should be stored rather than calculated on demand.
+| Area | Status | Notes |
+|------|--------|-------|
+| **BI / Dashboards** | ⏳ Pending | No dashboard project, no BI tool integration |
+| **Trading Bot** | ⏳ Pending | No execution engine, no order management |
+| **Machine Learning** | ⏳ Pending | Feature tables exist; no training/serving pipeline |
+| Additional exchanges | ⏳ Pending | Architecture is multi-provider ready; only Binance is live |
+| Maintenance / ops DAG on mainline | ⏳ Pending | May exist on a feature branch; not part of current develop baseline |
+| Advanced DQ metrics dashboards | ⏳ Pending | Structural validation exists; no metrics warehouse/UI |
+| Real-time / WebSocket streaming | ⏳ Pending | REST polling only |
 
 ---
 
-## Trading Features
-
-Gold should also generate reusable features.
-
-Examples:
-
-* Trend direction
-* Momentum
-* Volatility
-* Volume anomalies
-* Support and resistance approximations
-* Moving average relationships
-* Distance from previous highs/lows
-
-These features should simplify strategy development.
-
----
-
-## Trading Signals
-
-Gold may also expose reusable signal datasets.
-
-Examples:
-
-* Moving Average Crossovers
-* RSI Overbought / Oversold
-* MACD Crossovers
-* Breakout Signals
-* Trend Confirmation
-* Volatility Alerts
-
-Signals should remain generic and strategy-independent whenever possible.
-
----
-
-## Feature Tables
-
-The project should also prepare feature datasets that can later be consumed by:
-
-* Machine Learning models
-* Backtesting systems
-* Reinforcement Learning experiments
-* Statistical analysis
-
----
-
-# Bootstrap Pipeline
-
-The current Bronze pipeline performs incremental ingestion.
-
-A separate Bootstrap pipeline should also be implemented.
-
-Responsibilities:
-
-* Load complete historical datasets.
-* Configure historical depth.
-* Bootstrap newly configured symbols.
-* Resume interrupted historical loads.
-* Prepare the warehouse before incremental execution begins.
-
-Bootstrap should remain independent from the incremental pipeline.
-
----
-
-# Airflow Orchestration
-
-Once all individual components are complete, Apache Airflow should orchestrate the entire platform.
-
-The final DAG should coordinate multiple independent tasks.
-
-Example workflow:
-
-Start
-
-↓
-
-Bronze Pipeline
-
-↓
-
-dbt Staging
-
-↓
-
-Silver Models
-
-↓
-
-Aggregations
-
-↓
-
-Gold Models
-
-↓
-
-Quality Validation
-
-↓
-
-Completion
-
-Future DAGs may also include:
-
-* Bootstrap DAG
-* Incremental DAG
-* Daily Maintenance DAG
-* Data Quality DAG
-* Monitoring DAG
-
----
-
-# Testing
-
-Testing should evolve beyond the current integration script.
-
-Future testing should include:
-
-Unit Tests
-
-* Extractor
-* Loader
-* Data Quality
-* Monitoring
-
-Integration Tests
-
-* Bronze Pipeline
-* Bronze → Silver
-* Silver → Gold
-* End-to-End Pipeline
-
-Data Tests
-
-dbt tests should validate:
-
-* Unique keys
-* Null constraints
-* Accepted values
-* Referential consistency
-* Source freshness
-
----
-
-# Monitoring
-
-The pipeline should expose operational metrics.
-
-Examples:
-
-* Pipeline duration
-* Rows processed
-* Failed executions
-* Data freshness
-* Validation failures
-* Aggregation performance
-
-Monitoring information may later be integrated with Airflow.
-
----
-
-# Documentation
-
-Documentation should continue evolving together with the implementation.
-
-Remaining documentation includes:
-
-* Aggregation Architecture
-* Gold Layer
-* Airflow Architecture
-* Bootstrap Process
-* Trading Data Flow
-* dbt Lineage
-* End-to-End Pipeline Architecture
-
----
-
-# Final Architecture
-
-The completed platform should resemble the following flow.
-
-Binance REST API
-
-↓
-
-Bronze Pipeline
-
-↓
-
+# Target end-state architecture
+
+```
+Binance REST API (and future providers)
+        ↓
+Bronze Pipeline / Bootstrap Pipeline
+        ↓
 Bronze Layer
-
-↓
-
-Silver Staging
-
-↓
-
-Silver Canonical Models
-
-↓
-
+        ↓
+Silver Staging + Canonical Candles
+        ↓
 Silver Multi-Timeframe Aggregations
-
-↓
-
+        ↓
 Gold Technical Indicators
-
-↓
-
+        ↓
 Gold Trading Features
-
-↓
-
+        ↓
 Gold Trading Signals
+        ↓
+Gold Feature Tables
+        ↓
+┌───────────────┬──────────────────┬────────────────────┐
+│ BI Dashboards │  Trading Bot     │  ML / Backtesting  │
+│   (pending)   │   (pending)      │     (pending)      │
+└───────────────┴──────────────────┴────────────────────┘
+```
 
-↓
+The data platform path through **Gold Feature Tables** is implemented. Downstream product layers remain future work.
 
-Business Intelligence
-&
-Algorithmic Trading Bot
+---
 
-The final result should be a production-oriented market data platform demonstrating modern Data Engineering practices, scalable ELT architecture, dbt transformations, orchestration with Airflow and reusable analytical datasets for both Business Intelligence and automated trading systems.
+# Recommended next development themes
+
+1. **BI layer** — connect a BI tool (e.g. Metabase, Superset) to `silver` / `gold` read models.
+2. **Trading bot prototype** — read-only consumer of `market_dataset_*` + risk rules (out of scope for pure DE until defined).
+3. **ML experiments** — export feature tables; train offline models without coupling to Airflow at first.
+4. **Ops hardening** — maintenance DAG, freshness alerts, richer DQ metrics.
+5. **Second provider** — prove multi-provider Silver normalization.
+
+---
+
+# Final note
+
+This repository demonstrates modern Data Engineering practices: Medallion Architecture, configuration-driven ingestion, resumable historical loads, dbt incremental models, Airflow orchestration, and automated tests.
+
+It is **ready to present as a Data Engineering portfolio project**. BI, trading and ML products are intentional next steps—not missing half-finished claims inside the current codebase.
