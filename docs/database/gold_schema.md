@@ -96,6 +96,31 @@ Contain: keys + **all** Features + **all** Signals.
 
 Do not contain any OHLC/OHLCV or raw indicator values.
 
+### BI consumption view
+
+- `market_dataset_bi` (`dbt/models/gold/bi/market_dataset_bi.sql`)
+
+Materialization: **view** (not a table, not incremental)
+
+Purpose:
+
+- Single read model for **Business Intelligence** (primarily **Power BI**).
+- Unifies all Gold Feature Tables with `UNION ALL`.
+- Adds one column only: **`timeframe`** (`5m`, `15m`, `30m`, `1h`, `1d`).
+
+Logical grain for BI:
+
+```
+(exchange, symbol, open_time, timeframe)
+```
+
+Important:
+
+- Does **not** replace `market_dataset_*`.
+- Trading Bot, backtesting and future ML consumers keep reading
+  `market_dataset_5m` … `market_dataset_1d` directly.
+- No recalculation: pure projection over existing Feature Tables via `ref()`.
+
 ## Indicators Implemented
 
 - EMA (9, 21, 50, 200) - using weighted exponential smoothing (finite history EMA)
