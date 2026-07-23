@@ -121,6 +121,39 @@ Important:
   `market_dataset_5m` … `market_dataset_1d` directly.
 - No recalculation: pure projection over existing Feature Tables via `ref()`.
 
+### OHLCV BI consumption view
+
+- `market_candles_bi` (`dbt/models/gold/bi/market_candles_bi.sql`)
+
+Materialization: **view** (not a table and not incremental)
+
+Purpose:
+
+- Consumption view for **Business Intelligence**, primarily **Power BI**.
+- Unifies the five Silver aggregated candle models:
+  `market_candles_5m`, `market_candles_15m`, `market_candles_30m`,
+  `market_candles_1h` and `market_candles_1d`.
+- Adds the `timeframe` label (`5m`, `15m`, `30m`, `1h`, `1d`) so Power BI can
+  filter and compare candle resolutions in one model.
+- Exposes the existing OHLCV fields and Silver candle attributes for price,
+  volume and candlestick visualizations.
+
+The view contains no new calculations and does not recalculate or physically
+duplicate candles. It does not replace any Silver model. `market_dataset_bi`
+remains the Power BI source for Gold features, signals and KPI datasets; this
+view is specifically for OHLCV and candlestick use cases.
+
+Output columns:
+
+```
+exchange, symbol, open_time, close_time,
+open_price, high_price, low_price, close_price,
+volume, quote_asset_volume, number_of_trades,
+taker_buy_base_volume, taker_buy_quote_volume, ingested_at,
+candle_direction, body_size, upper_wick, lower_wick,
+candle_range, typical_price, ohlc_average, timeframe
+```
+
 ## Indicators Implemented
 
 - EMA (9, 21, 50, 200) - using weighted exponential smoothing (finite history EMA)
