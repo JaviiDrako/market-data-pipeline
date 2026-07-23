@@ -340,3 +340,63 @@ models:
       - name: timeframe
         description: Source candle timeframe label (5m, 15m, 30m, 1h, 1d).
         tests: [not_null]
+
+  - name: market_candles_bi
+    description: |
+      Business Intelligence consumption view for Power BI OHLCV and candlestick
+      visualizations. Unifies the five Silver aggregated candle models with a
+      timeframe label. It contains no new calculations and does not replace the
+      Silver candle models.
+    columns:
+      - name: exchange
+        description: Exchange identifier.
+        tests: [not_null]
+      - name: symbol
+        description: Trading pair symbol.
+        tests: [not_null]
+      - name: open_time
+        description: Candle open timestamp.
+        tests: [not_null]
+      - name: close_time
+        description: Candle close timestamp.
+      - name: open_price
+        description: Candle opening price.
+      - name: high_price
+        description: Highest traded price in the candle.
+      - name: low_price
+        description: Lowest traded price in the candle.
+      - name: close_price
+        description: Candle closing price.
+      - name: volume
+        description: Base-asset volume traded in the candle.
+      - name: quote_asset_volume
+        description: Quote-asset volume traded in the candle.
+      - name: number_of_trades
+        description: Number of trades in the candle.
+      - name: taker_buy_base_volume
+        description: Taker buy base-asset volume.
+      - name: taker_buy_quote_volume
+        description: Taker buy quote-asset volume.
+      - name: ingested_at
+        description: Timestamp of the latest source ingestion contributing to the candle.
+      - name: candle_direction
+        description: Candle direction (1 bullish, -1 bearish, 0 doji).
+      - name: body_size
+        description: Absolute candle body size.
+      - name: upper_wick
+        description: Upper candle wick size.
+      - name: lower_wick
+        description: Lower candle wick size.
+      - name: candle_range
+        description: High-to-low candle range.
+      - name: typical_price
+        description: Typical price attribute already calculated in Silver.
+      - name: ohlc_average
+        description: OHLC average attribute already calculated in Silver.
+      - name: timeframe
+        description: Source candle timeframe label (5m, 15m, 30m, 1h, 1d).
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['5m', '15m', '30m', '1h', '1d']
