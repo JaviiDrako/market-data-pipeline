@@ -45,6 +45,22 @@ Materialization: incremental + MERGE
 
 Primary key: (exchange, symbol, open_time)
 
+### Incremental window strategy
+
+Indicator models identify rows that are not yet materialized by the natural key
+`(exchange, symbol, open_time)`. The incremental cutoff is evaluated per
+`exchange` and `symbol`; a global `MAX(open_time)` is not used. Missing rows
+with an older timestamp are also detected so a delayed symbol is not silently
+skipped.
+
+For every affected symbol, the complete available Silver candle history is
+loaded into the window-calculation CTEs before the final projection is filtered
+to rows that must be materialized. This preserves the historical context used
+by the cumulative MACD signal and the rolling 20-period Bollinger standard
+deviation. The indicator formulas themselves are unchanged. Rows in the
+warm-up portion of a series may legitimately remain NULL when their window
+does not yet contain enough observations.
+
 ### Features
 - trend_features (ephemeral, reusable impl)
 - momentum_features (ephemeral, reusable impl)
