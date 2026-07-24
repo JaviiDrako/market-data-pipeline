@@ -117,6 +117,10 @@ Logical grain for BI:
 Important:
 
 - Does **not** replace `market_dataset_*`.
+- Adapts numeric feature columns to PostgreSQL `double precision` for BI
+  consumers such as Power BI. The original numeric types and precision of the
+  canonical Gold tables remain unchanged; the view does not round values or
+  replace legitimate `NULL`s.
 - Trading Bot, backtesting and future ML consumers keep reading
   `market_dataset_5m` … `market_dataset_1d` directly.
 - No recalculation: pure projection over existing Feature Tables via `ref()`.
