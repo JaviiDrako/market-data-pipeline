@@ -4,16 +4,8 @@
     incremental_strategy='merge'
 ) }}
 
-WITH source AS (
-    SELECT *
-    FROM {{ ref('market_candles_1h') }}
-    {% if is_incremental() %}
-        WHERE open_time >= (
-            SELECT COALESCE(MAX(open_time) - INTERVAL '90 days', TIMESTAMP '1970-01-01')
-            FROM {{ this }}
-        )
-    {% endif %}
-),
+WITH
+{{ gold_incremental_window_context(ref('market_candles_1h')) }},
 
 -- Row number and max_rn for weighting (common for EMAs and MACD signal)
 rn AS (
@@ -88,6 +80,14 @@ macd_base AS (
         {{ ema('close_price', 12) }} AS ema12,
         {{ ema('close_price', 26) }} AS ema26
     FROM indicators
+),
+
+macd_calculated AS (
+    SELECT
+        *,
+        (ema12 - ema26) AS macd,
+        {{ macd_signal(9) }} AS macd_signal
+    FROM macd_base
 )
 
 SELECT 
@@ -106,21 +106,16 @@ SELECT
 
     rsi_14,
 
-    (ema12 - ema26) AS macd,
-    {{ macd_signal(9) }} AS macd_signal,
-    (ema12 - ema26) - {{ macd_signal(9) }} AS macd_histogram,
+    macd,
+    macd_signal,
+    macd - macd_signal AS macd_histogram,
 
     atr_14,
 
     bb_middle,
-    bb_middle + 2 * {{ bollinger_std(20) }} AS bb_upper,
-    bb_middle - 2 * {{ bollinger_std(20) }} AS bb_lower
+    bb_middle + 2 * bb_std AS bb_upper,
+    bb_middle - 2 * bb_std AS bb_lower
 
-FROM macd_base
-
-{% if is_incremental() %}
-WHERE open_time > (
-    SELECT COALESCE(MAX(open_time), TIMESTAMP '1970-01-01')
-    FROM {{ this }}
-)
-{% endif %}
+FROM macd_calculated
+JOIN new_rows
+  USING (exchange, symbol, open_time)
