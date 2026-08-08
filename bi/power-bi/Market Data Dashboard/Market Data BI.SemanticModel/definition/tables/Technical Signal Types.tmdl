@@ -1,0 +1,37 @@
+/// Eje desconectado para representar eventos técnicos en la línea temporal.
+table 'Technical Signal Types'
+	lineageTag: 0494bfd1-b009-458b-8a43-4d9441d4c42c
+
+	column 'Signal Type'
+		lineageTag: 0e201e73-368a-4b23-ae26-31f3022cd32b
+		isNameInferred
+		sourceColumn: [Signal Type]
+		sortByColumn: Sort
+
+	column Polarity
+		lineageTag: a700ccf3-79ab-4071-ac66-68e3a1d17885
+		isNameInferred
+		sourceColumn: [Polarity]
+
+	column Sort
+		lineageTag: 9b57b75c-8918-47a2-83a3-cebe70fb1434
+		isNameInferred
+		sourceColumn: [Sort]
+
+	partition 'Technical Signal Types' = calculated
+		mode: import
+		source =
+				DATATABLE(
+				    "Signal Type", STRING,
+				    "Polarity", STRING,
+				    "Sort", INTEGER,
+				    {
+				        { "MACD Bullish Cross", "Bullish", 1 },
+				        { "MACD Bearish Cross", "Bearish", 2 },
+				        { "Golden Cross", "Bullish", 3 },
+				        { "Death Cross", "Bearish", 4 },
+				        { "Breakout", "Neutral", 5 },
+				        { "New High", "Bullish", 6 },
+				        { "New Low", "Bearish", 7 }
+				    }
+				)

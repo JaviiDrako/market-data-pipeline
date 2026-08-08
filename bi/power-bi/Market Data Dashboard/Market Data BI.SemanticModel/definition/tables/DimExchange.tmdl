@@ -1,0 +1,20 @@
+/// Dimensión compartida de exchanges que filtra las tablas de velas e indicadores.
+table DimExchange
+	lineageTag: 82b4232f-f3ce-40f5-a770-01de19853108
+
+	/// Exchange de mercado usado como filtro compartido.
+	column exchange
+		lineageTag: 84bbf310-bad6-4291-ba63-8cc8f3e7b2d2
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [exchange]
+
+	partition DimExchange = calculated
+		mode: import
+		source =
+				DISTINCT(
+				    UNION(
+				        SELECTCOLUMNS('gold market_candles_bi', "exchange", 'gold market_candles_bi'[exchange]),
+				        SELECTCOLUMNS('gold market_dataset_bi', "exchange", 'gold market_dataset_bi'[exchange])
+				    )
+				)

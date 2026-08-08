@@ -1,0 +1,31 @@
+relationship DimExchange_to_Candles
+	fromColumn: 'gold market_candles_bi'.exchange
+	toColumn: DimExchange.exchange
+
+relationship DimExchange_to_Dataset
+	fromColumn: 'gold market_dataset_bi'.exchange
+	toColumn: DimExchange.exchange
+
+relationship DimSymbol_to_Candles
+	fromColumn: 'gold market_candles_bi'.symbol
+	toColumn: DimSymbol.symbol
+
+relationship DimSymbol_to_Dataset
+	fromColumn: 'gold market_dataset_bi'.symbol
+	toColumn: DimSymbol.symbol
+
+relationship DimTimeframe_to_Candles
+	fromColumn: 'gold market_candles_bi'.timeframe
+	toColumn: DimTimeframe.timeframe
+
+relationship DimTimeframe_to_Dataset
+	fromColumn: 'gold market_dataset_bi'.timeframe
+	toColumn: DimTimeframe.timeframe
+
+relationship DimDateTime_to_Candles
+	fromColumn: 'gold market_candles_bi'.open_time
+	toColumn: DimDateTime.open_time
+
+relationship DimDateTime_to_Dataset
+	fromColumn: 'gold market_dataset_bi'.open_time
+	toColumn: DimDateTime.open_time

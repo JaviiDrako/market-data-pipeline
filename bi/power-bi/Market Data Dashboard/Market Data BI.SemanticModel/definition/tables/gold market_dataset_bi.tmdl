@@ -1,0 +1,1002 @@
+table 'gold market_dataset_bi'
+	lineageTag: 498c1487-323d-42dc-88f2-cfab06214ee6
+
+	/// Último RSI normalizado no vacío según el contexto visible.
+	measure 'Current Normalized RSI' =
+			VAR _LatestTime =
+			    MAXX(
+			        FILTER(
+			            VALUES('gold market_dataset_bi'[open_time]),
+			            NOT ISBLANK(CALCULATE(MAX('gold market_dataset_bi'[rsi_normalized])))
+			        ),
+			        'gold market_dataset_bi'[open_time]
+			    )
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_dataset_bi'[rsi_normalized]),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+		formatString: 0.00
+		displayFolder: KPIs / Indicators
+		lineageTag: e6e2f708-350f-4010-b962-de202f48493d
+
+	/// Último ATR porcentual no vacío; el origen almacena puntos porcentuales.
+	measure 'Current ATR %' =
+			VAR _LatestTime =
+			    MAXX(
+			        FILTER(
+			            VALUES('gold market_dataset_bi'[open_time]),
+			            NOT ISBLANK(CALCULATE(MAX('gold market_dataset_bi'[atr_pct])))
+			        ),
+			        'gold market_dataset_bi'[open_time]
+			    )
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_dataset_bi'[atr_pct]),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+		formatString: 0.00\%
+		displayFolder: KPIs / Indicators
+		lineageTag: a2432ec5-59d4-458a-bdaf-bf7fe64ae262
+
+	/// Última fortaleza MACD no vacía según el contexto visible.
+	measure 'Current MACD Strength' =
+			VAR _LatestTime =
+			    MAXX(
+			        FILTER(
+			            VALUES('gold market_dataset_bi'[open_time]),
+			            NOT ISBLANK(CALCULATE(MAX('gold market_dataset_bi'[macd_strength])))
+			        ),
+			        'gold market_dataset_bi'[open_time]
+			    )
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_dataset_bi'[macd_strength]),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+		formatString: 0.00
+		displayFolder: KPIs / Indicators
+		lineageTag: 82021a8d-3d0d-47b7-8ae2-a4be4819cdcd
+
+	/// Último histograma MACD porcentual no vacío; el origen almacena puntos porcentuales.
+	measure 'Current MACD Histogram %' =
+			VAR _LatestTime =
+			    MAXX(
+			        FILTER(
+			            VALUES('gold market_dataset_bi'[open_time]),
+			            NOT ISBLANK(CALCULATE(MAX('gold market_dataset_bi'[macd_histogram_pct])))
+			        ),
+			        'gold market_dataset_bi'[open_time]
+			    )
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_dataset_bi'[macd_histogram_pct]),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+		formatString: 0.00\%
+		displayFolder: KPIs / Indicators
+		lineageTag: 4dfb9fae-874f-4a46-80e5-8b7ac21ae87b
+
+	/// Última posición de Bollinger no vacía según el contexto visible.
+	measure 'Current Bollinger Position' =
+			VAR _LatestTime =
+			    MAXX(
+			        FILTER(
+			            VALUES('gold market_dataset_bi'[open_time]),
+			            NOT ISBLANK(CALCULATE(MAX('gold market_dataset_bi'[bollinger_position])))
+			        ),
+			        'gold market_dataset_bi'[open_time]
+			    )
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_dataset_bi'[bollinger_position]),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+		formatString: 0.00
+		displayFolder: KPIs / Indicators
+		lineageTag: 8c37209c-3c1f-47be-87ee-2fe45632b65f
+
+	/// Última distancia porcentual del precio frente a EMA50; el origen almacena puntos porcentuales.
+	measure 'Current Price vs EMA50 %' =
+			VAR _LatestTime =
+			    MAXX(
+			        FILTER(
+			            VALUES('gold market_dataset_bi'[open_time]),
+			            NOT ISBLANK(CALCULATE(MAX('gold market_dataset_bi'[price_vs_ema50_pct])))
+			        ),
+			        'gold market_dataset_bi'[open_time]
+			    )
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_dataset_bi'[price_vs_ema50_pct]),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+		formatString: 0.00\%
+		displayFolder: KPIs / Indicators
+		lineageTag: 512c238a-b01f-4d58-9c4e-56c3cf7cfb15
+
+	/// Filas visibles con al menos una condición alcista; cada fila se cuenta una sola vez.
+	measure 'Bullish Signal Count' =
+			COUNTROWS(
+			    FILTER(
+			        'gold market_dataset_bi',
+			        'gold market_dataset_bi'[ema_bullish_alignment] = TRUE()
+			            || 'gold market_dataset_bi'[golden_cross] = TRUE()
+			            || 'gold market_dataset_bi'[rsi_recovering] = TRUE()
+			            || 'gold market_dataset_bi'[macd_bullish_cross] = TRUE()
+			            || 'gold market_dataset_bi'[macd_positive] = TRUE()
+			            || 'gold market_dataset_bi'[bollinger_breakout_up] = TRUE()
+			            || 'gold market_dataset_bi'[new_20_high] = TRUE()
+			            || 'gold market_dataset_bi'[new_50_high] = TRUE()
+			            || 'gold market_dataset_bi'[breakout_confirmation] = TRUE()
+			    )
+			)
+		formatString: #,##0
+		displayFolder: KPIs / Signals
+		lineageTag: 82399160-45a3-4b95-8329-4765ed05325f
+
+	/// Filas visibles con al menos una condición bajista; cada fila se cuenta una sola vez.
+	measure 'Bearish Signal Count' =
+			COUNTROWS(
+			    FILTER(
+			        'gold market_dataset_bi',
+			        'gold market_dataset_bi'[ema_bearish_alignment] = TRUE()
+			            || 'gold market_dataset_bi'[death_cross] = TRUE()
+			            || 'gold market_dataset_bi'[rsi_overbought] = TRUE()
+			            || 'gold market_dataset_bi'[macd_bearish_cross] = TRUE()
+			            || 'gold market_dataset_bi'[bollinger_breakout_down] = TRUE()
+			            || 'gold market_dataset_bi'[new_20_low] = TRUE()
+			            || 'gold market_dataset_bi'[new_50_low] = TRUE()
+			    )
+			)
+		formatString: #,##0
+		displayFolder: KPIs / Signals
+		lineageTag: d6af237b-5db1-42ac-85ad-f38154796934
+
+	/// Filas visibles sin ninguna condición alcista ni bajista.
+	measure 'Neutral Signal Count' =
+			COUNTROWS(
+			    FILTER(
+			        'gold market_dataset_bi',
+			        NOT(('gold market_dataset_bi'[ema_bullish_alignment] = TRUE()
+			            || 'gold market_dataset_bi'[golden_cross] = TRUE()
+			            || 'gold market_dataset_bi'[rsi_recovering] = TRUE()
+			            || 'gold market_dataset_bi'[macd_bullish_cross] = TRUE()
+			            || 'gold market_dataset_bi'[macd_positive] = TRUE()
+			            || 'gold market_dataset_bi'[bollinger_breakout_up] = TRUE()
+			            || 'gold market_dataset_bi'[new_20_high] = TRUE()
+			            || 'gold market_dataset_bi'[new_50_high] = TRUE()
+			            || 'gold market_dataset_bi'[breakout_confirmation] = TRUE()) || ('gold market_dataset_bi'[ema_bearish_alignment] = TRUE()
+			            || 'gold market_dataset_bi'[death_cross] = TRUE()
+			            || 'gold market_dataset_bi'[rsi_overbought] = TRUE()
+			            || 'gold market_dataset_bi'[macd_bearish_cross] = TRUE()
+			            || 'gold market_dataset_bi'[bollinger_breakout_down] = TRUE()
+			            || 'gold market_dataset_bi'[new_20_low] = TRUE()
+			            || 'gold market_dataset_bi'[new_50_low] = TRUE()))
+			    )
+			)
+		formatString: #,##0
+		displayFolder: KPIs / Signals
+		lineageTag: 8cf18374-3812-43ad-9dc6-9e4b38ad575b
+
+	/// Proporción de filas visibles que contienen al menos una señal alcista.
+	measure 'Bullish Signal Ratio %' = DIVIDE([Bullish Signal Count], COUNTROWS('gold market_dataset_bi'))
+		formatString: 0.00%
+		displayFolder: Charts / Signals
+		lineageTag: 4707028c-2389-4eb8-b0df-0b1e9f7553e8
+
+	/// Proporción de filas visibles que contienen al menos una señal bajista.
+	measure 'Bearish Signal Ratio %' = DIVIDE([Bearish Signal Count], COUNTROWS('gold market_dataset_bi'))
+		formatString: 0.00%
+		displayFolder: Charts / Signals
+		lineageTag: b8df19d7-fca5-4261-8c1b-3fd2c3ece3fd
+
+	/// Promedio del RSI normalizado en el contexto visible.
+	measure 'Average RSI Normalized' = AVERAGE('gold market_dataset_bi'[rsi_normalized])
+		formatString: 0.00
+		displayFolder: Charts / Indicators
+		lineageTag: 38d59f70-2fae-4c94-8e87-eceb59f98ffd
+
+	/// Promedio de la fortaleza MACD en el contexto visible.
+	measure 'Average MACD Strength' = AVERAGE('gold market_dataset_bi'[macd_strength])
+		formatString: 0.00
+		displayFolder: Charts / Indicators
+		lineageTag: 9426cc1d-9834-4086-8db1-f8add783ab29
+
+	/// Promedio del histograma MACD porcentual en puntos porcentuales.
+	measure 'Average MACD Histogram %' = AVERAGE('gold market_dataset_bi'[macd_histogram_pct])
+		formatString: 0.00\%
+		displayFolder: Charts / Indicators
+		lineageTag: ff6fe46a-62c8-473c-854f-09936fe61e05
+
+	/// Promedio del ATR porcentual en puntos porcentuales.
+	measure 'Average ATR %' = AVERAGE('gold market_dataset_bi'[atr_pct])
+		formatString: 0.00\%
+		displayFolder: Charts / Indicators
+		lineageTag: e49419ef-aff7-456a-ba37-03dfd618e4c3
+
+	/// Serie temporal dinámica controlada por el selector de indicador técnico.
+	measure 'Selected Technical Indicator' =
+			VAR _Indicator =
+			    SELECTEDVALUE('Technical Indicator Selector'[Indicator], "RSI Normalized")
+			RETURN
+			    SWITCH(
+			        _Indicator,
+			        "RSI Normalized", [Average RSI Normalized],
+			        "MACD Strength", [Average MACD Strength],
+			        "MACD Histogram", [Average MACD Histogram %],
+			        "ATR %", [Average ATR %],
+			        "Bollinger Position", AVERAGE('gold market_dataset_bi'[bollinger_position]),
+			        "Price vs EMA50 %", AVERAGE('gold market_dataset_bi'[price_vs_ema50_pct]),
+			        [Average RSI Normalized]
+			    )
+		formatString: 0.00
+		displayFolder: Technical Analysis / Dynamic
+		lineageTag: 8580bba3-afff-45ba-a737-49765e9202cc
+
+	/// Título dinámico del gráfico principal de análisis técnico.
+	measure 'Selected Technical Indicator Title' = "Evolución de " & SELECTEDVALUE('Technical Indicator Selector'[Indicator], "RSI Normalized")
+		displayFolder: Technical Analysis / Dynamic
+		lineageTag: cb536a29-c3c4-4ea8-a419-347cc5a48c67
+
+	/// Puntuación técnica compuesta basada en EMA, MACD, RSI, Bollinger, distancia a EMA50 y breakouts.
+	measure 'Market Bias Score' =
+			VAR _LatestTime = MAX('gold market_dataset_bi'[open_time])
+			VAR _EMAAlignment =
+			    CALCULATE(
+			        MAX('gold market_dataset_bi'[ema_alignment]),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+			VAR _RSI = [Current Normalized RSI]
+			VAR _MACD = [Current MACD Strength]
+			VAR _Bollinger = [Current Bollinger Position]
+			VAR _EMA50 = [Current Price vs EMA50 %]
+			VAR _BullBreak =
+			    CALCULATE(
+			        COUNTROWS(
+			            FILTER(
+			                'gold market_dataset_bi',
+			                'gold market_dataset_bi'[bollinger_breakout_up] = TRUE()
+			                    || 'gold market_dataset_bi'[new_20_high] = TRUE()
+			                    || 'gold market_dataset_bi'[new_50_high] = TRUE()
+			                    || ('gold market_dataset_bi'[breakout_confirmation] = TRUE() && 'gold market_dataset_bi'[price_vs_ema50_pct] >= 0)
+			            )
+			        ),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+			VAR _BearBreak =
+			    CALCULATE(
+			        COUNTROWS(
+			            FILTER(
+			                'gold market_dataset_bi',
+			                'gold market_dataset_bi'[bollinger_breakout_down] = TRUE()
+			                    || 'gold market_dataset_bi'[new_20_low] = TRUE()
+			                    || 'gold market_dataset_bi'[new_50_low] = TRUE()
+			                    || ('gold market_dataset_bi'[breakout_confirmation] = TRUE() && 'gold market_dataset_bi'[price_vs_ema50_pct] < 0)
+			            )
+			        ),
+			        KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime)
+			    )
+			VAR _EMAScore = SWITCH(TRUE(), _EMAAlignment > 0, 1, _EMAAlignment < 0, -1, 0)
+			VAR _MACDScore = SWITCH(TRUE(), _MACD > 0, 1, _MACD < 0, -1, 0)
+			VAR _RSIScore = SWITCH(TRUE(), _RSI >= 0.20, 1, _RSI <= -0.20, -1, 0)
+			VAR _BollingerScore = SWITCH(TRUE(), _Bollinger >= 0.60, 1, _Bollinger <= 0.40, -1, 0)
+			VAR _EMA50Score = SWITCH(TRUE(), _EMA50 > 0, 1, _EMA50 < 0, -1, 0)
+			VAR _BreakScore = SWITCH(TRUE(), _BullBreak > 0 && _BearBreak = 0, 1, _BearBreak > 0 && _BullBreak = 0, -1, 0)
+			RETURN
+			    _EMAScore + _MACDScore + _RSIScore + _BollingerScore + _EMA50Score + _BreakScore
+		formatString: 0
+		displayFolder: Technical Analysis / Bias
+		lineageTag: 24e1363f-1a0f-4cb1-90bc-58708cce854c
+
+	/// Clasificación institucional del sesgo de mercado derivada de confirmación multi-indicador.
+	measure 'Market Bias' =
+			VAR _Score = [Market Bias Score]
+			RETURN
+			    SWITCH(
+			        TRUE(),
+			        ISBLANK(_Score), "Sin datos",
+			        _Score >= 4, UNICHAR(128994) & " Strong Bullish",
+			        _Score >= 1, UNICHAR(128994) & " Bullish",
+			        _Score <= -4, UNICHAR(128308) & " Strong Bearish",
+			        _Score <= -1, UNICHAR(128308) & " Bearish",
+			        UNICHAR(9898) & " Neutral"
+			    )
+		displayFolder: Technical Analysis / Bias
+		lineageTag: a9d1f184-831a-471f-9b54-5cb8d8c7cd4a
+
+	/// Componente alcista de la comparación multi-timeframe.
+	measure 'MTF Bullish Bias' =
+			VAR _Score = [Market Bias Score]
+			RETURN IF(_Score > 0, _Score, BLANK())
+		formatString: 0
+		displayFolder: Technical Analysis / Multi-Timeframe
+		lineageTag: adb3d220-51cd-4fe2-9443-9b9db9ee36cd
+
+	/// Componente bajista de la comparación multi-timeframe.
+	measure 'MTF Bearish Bias' =
+			VAR _Score = [Market Bias Score]
+			RETURN IF(_Score < 0, _Score, BLANK())
+		formatString: 0
+		displayFolder: Technical Analysis / Multi-Timeframe
+		lineageTag: 91563f56-d3c4-4680-b3a1-f859af5618b4
+
+	/// Marcador neutral de la comparación multi-timeframe.
+	measure 'MTF Neutral Bias' =
+			VAR _Score = [Market Bias Score]
+			RETURN IF(_Score = 0, 0.25, BLANK())
+		formatString: 0.00
+		displayFolder: Technical Analysis / Multi-Timeframe
+		lineageTag: 0361c0ae-5054-4d32-ac86-f7190ae729d3
+
+	/// Puntuación -1/0/1 para cada fila de la matriz de confirmación técnica.
+	measure 'Signal Confirmation Score' =
+			VAR _Signal = SELECTEDVALUE('Technical Signal Matrix'[Signal])
+			VAR _LatestTime = MAX('gold market_dataset_bi'[open_time])
+			VAR _EMAAlignment = CALCULATE(MAX('gold market_dataset_bi'[ema_alignment]), KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime))
+			VAR _BullCross = CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[macd_bullish_cross] = TRUE())), KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime))
+			VAR _BearCross = CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[macd_bearish_cross] = TRUE())), KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime))
+			VAR _BullBreak = CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[bollinger_breakout_up] = TRUE() || 'gold market_dataset_bi'[new_20_high] = TRUE() || 'gold market_dataset_bi'[new_50_high] = TRUE() || ('gold market_dataset_bi'[breakout_confirmation] = TRUE() && 'gold market_dataset_bi'[price_vs_ema50_pct] >= 0))), KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime))
+			VAR _BearBreak = CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[bollinger_breakout_down] = TRUE() || 'gold market_dataset_bi'[new_20_low] = TRUE() || 'gold market_dataset_bi'[new_50_low] = TRUE() || ('gold market_dataset_bi'[breakout_confirmation] = TRUE() && 'gold market_dataset_bi'[price_vs_ema50_pct] < 0))), KEEPFILTERS('gold market_dataset_bi'[open_time] = _LatestTime))
+			VAR _MACDScore = SWITCH(TRUE(), _BullCross > 0 && _BearCross = 0, 1, _BearCross > 0 && _BullCross = 0, -1, [Current MACD Strength] > 0, 1, [Current MACD Strength] < 0, -1, 0)
+			VAR _RSIScore = SWITCH(TRUE(), [Current Normalized RSI] >= 0.20, 1, [Current Normalized RSI] <= -0.20, -1, 0)
+			VAR _BollingerScore = SWITCH(TRUE(), [Current Bollinger Position] >= 0.60, 1, [Current Bollinger Position] <= 0.40, -1, 0)
+			VAR _BreakScore = SWITCH(TRUE(), _BullBreak > 0 && _BearBreak = 0, 1, _BearBreak > 0 && _BullBreak = 0, -1, 0)
+			VAR _ResultScore = SWITCH(TRUE(), [Market Bias Score] > 0, 1, [Market Bias Score] < 0, -1, 0)
+			RETURN
+			    SWITCH(
+			        _Signal,
+			        "EMA Alignment", SWITCH(TRUE(), _EMAAlignment > 0, 1, _EMAAlignment < 0, -1, 0),
+			        "MACD", _MACDScore,
+			        "RSI", _RSIScore,
+			        "Bollinger", _BollingerScore,
+			        "Breakout", _BreakScore,
+			        "Resultado", _ResultScore,
+			        BLANK()
+			    )
+		formatString: 0
+		displayFolder: Technical Analysis / Confirmation
+		lineageTag: e3a88ed1-a035-41d5-810a-890b7ed4e171
+
+	/// Etiqueta accesible con icono y texto para la matriz de confirmación.
+	measure 'Signal Confirmation' =
+			VAR _Score = [Signal Confirmation Score]
+			RETURN
+			    SWITCH(
+			        TRUE(),
+			        ISBLANK(_Score), BLANK(),
+			        _Score > 0, UNICHAR(128994) & " Alcista",
+			        _Score < 0, UNICHAR(128308) & " Bajista",
+			        UNICHAR(9898) & " Neutral"
+			    )
+		displayFolder: Technical Analysis / Confirmation
+		lineageTag: f2c89440-e715-4265-bdcc-d78c84b9c52a
+
+	/// Marcador temporal de ocurrencias para las señales técnicas seleccionadas en la leyenda.
+	measure 'Signal Event Marker' =
+			VAR _SignalType = SELECTEDVALUE('Technical Signal Types'[Signal Type])
+			VAR _EventCount =
+			    SWITCH(
+			        _SignalType,
+			        "MACD Bullish Cross", CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[macd_bullish_cross] = TRUE()))),
+			        "MACD Bearish Cross", CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[macd_bearish_cross] = TRUE()))),
+			        "Golden Cross", CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[golden_cross] = TRUE()))),
+			        "Death Cross", CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[death_cross] = TRUE()))),
+			        "Breakout", CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[breakout_confirmation] = TRUE() || 'gold market_dataset_bi'[bollinger_breakout_up] = TRUE() || 'gold market_dataset_bi'[bollinger_breakout_down] = TRUE()))),
+			        "New High", CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[new_20_high] = TRUE() || 'gold market_dataset_bi'[new_50_high] = TRUE()))),
+			        "New Low", CALCULATE(COUNTROWS(FILTER('gold market_dataset_bi', 'gold market_dataset_bi'[new_20_low] = TRUE() || 'gold market_dataset_bi'[new_50_low] = TRUE()))),
+			        BLANK()
+			    )
+			RETURN IF(_EventCount > 0, _EventCount, BLANK())
+		formatString: 0
+		displayFolder: Technical Analysis / Timeline
+		lineageTag: 3348ef90-0efe-4171-bdc9-407b00536e1a
+
+	/// Cantidad de estados tecnicos visibles en el contexto actual.
+	measure 'Technical State Count' = COUNTROWS('gold market_dataset_bi')
+		formatString: #,##0
+		displayFolder: Market Intelligence / Distribution
+		lineageTag: 4d9f6dfd-e266-4f56-97b1-a1fa77136cfb
+
+	/// Codigo de polaridad usado para aplicar color financiero por estado tecnico.
+	measure 'Signal Distribution Score' =
+			SWITCH(
+			    SELECTEDVALUE('gold market_dataset_bi'[Bias Category]),
+			    "Bullish", 1,
+			    "Bearish", -1,
+			    0
+			)
+		formatString: 0
+		displayFolder: Market Intelligence / Distribution
+		lineageTag: 0d765e9f-e043-4bcf-9671-4f2829896191
+
+	column exchange
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 99d64651-d6ec-4c72-a4e3-c58c65fc778f
+		summarizeBy: none
+		sourceColumn: exchange
+
+		annotation SummarizationSetBy = Automatic
+
+	column symbol
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 05a7af28-b4a6-48a0-bf2c-f4bac977d3f8
+		summarizeBy: none
+		sourceColumn: symbol
+
+		annotation SummarizationSetBy = Automatic
+
+	column open_time
+		dataType: dateTime
+		isHidden
+		formatString: dd MMM yyyy HH:mm
+		lineageTag: 21fcbeaf-f2c4-46c0-bbec-a5c037da1fb3
+		summarizeBy: none
+		sourceColumn: open_time
+
+		annotation SummarizationSetBy = Automatic
+
+	column ema9_distance_pct
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 9d227289-a384-4277-8c5c-cc0dc17bc50a
+		summarizeBy: sum
+		sourceColumn: ema9_distance_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ema21_distance_pct
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 160e31c6-a104-4fcc-b41d-4027b2fd92d5
+		summarizeBy: sum
+		sourceColumn: ema21_distance_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ema50_distance_pct
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 9eb232d7-61e2-47e6-b1b4-f87ebae6aaad
+		summarizeBy: sum
+		sourceColumn: ema50_distance_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ema200_distance_pct
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: cf5dbd0e-f2b1-4ed7-96df-f8f4c36745ca
+		summarizeBy: sum
+		sourceColumn: ema200_distance_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ema_alignment
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 378f5590-cc6b-4d87-8b47-7af541062bc2
+		summarizeBy: sum
+		sourceColumn: ema_alignment
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ema_slope_9
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 41db3ad2-a1c3-4c76-87ec-b9297a531e39
+		summarizeBy: sum
+		sourceColumn: ema_slope_9
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ema_slope_21
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 08f0a1c8-6aaa-446a-8b67-6816d4d0e08b
+		summarizeBy: sum
+		sourceColumn: ema_slope_21
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ema_slope_50
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 2662f956-bd15-4544-bf93-5416335c14e6
+		summarizeBy: sum
+		sourceColumn: ema_slope_50
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column price_vs_ema50_pct
+		dataType: double
+		lineageTag: 3a9870cf-f567-457a-bafa-775b377af6c9
+		summarizeBy: sum
+		sourceColumn: price_vs_ema50_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column price_vs_ema200_pct
+		dataType: double
+		lineageTag: a93b4dcf-c2a4-4741-a042-7c122805b674
+		summarizeBy: sum
+		sourceColumn: price_vs_ema200_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column rsi_normalized
+		dataType: double
+		lineageTag: ab409e47-8100-4373-ba9c-20ec28a4e6b2
+		summarizeBy: sum
+		sourceColumn: rsi_normalized
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column macd_strength
+		dataType: double
+		lineageTag: 378939ef-2ade-4aff-bf5a-26f578f079d9
+		summarizeBy: sum
+		sourceColumn: macd_strength
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column macd_histogram_pct
+		dataType: double
+		lineageTag: 64bd6c7f-6972-4ac0-b74b-6073f16f60e8
+		summarizeBy: sum
+		sourceColumn: macd_histogram_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column price_change_5
+		dataType: double
+		lineageTag: 202e0f81-fb6f-4b1c-a40e-549a1cc0c0a5
+		summarizeBy: sum
+		sourceColumn: price_change_5
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column price_change_10
+		dataType: double
+		lineageTag: 134fb812-6bdf-4471-aaf1-e2420c07643f
+		summarizeBy: sum
+		sourceColumn: price_change_10
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column price_change_20
+		dataType: double
+		lineageTag: b3c7dbc9-9567-409f-ba34-cbc72d531bb4
+		summarizeBy: sum
+		sourceColumn: price_change_20
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column atr_pct
+		dataType: double
+		lineageTag: af14e556-81f9-4ed4-8370-d20b649feb31
+		summarizeBy: sum
+		sourceColumn: atr_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column rolling_std
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 901cf5f1-9122-49be-ab1f-b92fd62e99ba
+		summarizeBy: sum
+		sourceColumn: rolling_std
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column bollinger_width
+		dataType: double
+		lineageTag: 3bffc5f7-1612-41df-9f32-41ad759d1836
+		summarizeBy: sum
+		sourceColumn: bollinger_width
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column bollinger_position
+		dataType: double
+		lineageTag: 689f4f35-438b-4283-8d93-dece20293d82
+		summarizeBy: sum
+		sourceColumn: bollinger_position
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column candle_body_ratio
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 781fe5ba-308e-48a0-80b5-9e37ec7035dc
+		summarizeBy: sum
+		sourceColumn: candle_body_ratio
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column upper_wick_ratio
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 8d716e2f-c2ef-4839-82b6-0354322b2d8e
+		summarizeBy: sum
+		sourceColumn: upper_wick_ratio
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column lower_wick_ratio
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 55bdad79-c755-4da8-9cee-f917a2a647ed
+		summarizeBy: sum
+		sourceColumn: lower_wick_ratio
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column distance_to_20_high
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: d23fe520-3183-49d1-b3e2-ba07127b0b22
+		summarizeBy: sum
+		sourceColumn: distance_to_20_high
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column distance_to_20_low
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 0f343f88-c28c-4166-986a-a4b0b555a625
+		summarizeBy: sum
+		sourceColumn: distance_to_20_low
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column distance_to_50_high
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: b25dcdde-1af6-4446-ab9c-90d925beb668
+		summarizeBy: sum
+		sourceColumn: distance_to_50_high
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column distance_to_50_low
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 885251d6-5afa-4ba4-8e22-e03ea0f0ebee
+		summarizeBy: sum
+		sourceColumn: distance_to_50_low
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ema_bullish_alignment
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 01d15f81-4420-43f3-a704-cf0de8ab1f68
+		summarizeBy: none
+		sourceColumn: ema_bullish_alignment
+
+		annotation SummarizationSetBy = Automatic
+
+	column ema_bearish_alignment
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: b83ad6e7-69b8-461b-b7cc-f5b31a36267e
+		summarizeBy: none
+		sourceColumn: ema_bearish_alignment
+
+		annotation SummarizationSetBy = Automatic
+
+	column price_above_ema50
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 5ab3dc64-22fc-45f3-8686-999110e1663e
+		summarizeBy: none
+		sourceColumn: price_above_ema50
+
+		annotation SummarizationSetBy = Automatic
+
+	column price_above_ema200
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: fab295c0-c924-4a55-ab17-a2d233d0e21b
+		summarizeBy: none
+		sourceColumn: price_above_ema200
+
+		annotation SummarizationSetBy = Automatic
+
+	column golden_cross
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: f254f824-b23f-4ca1-b9b7-c33f55187361
+		summarizeBy: none
+		sourceColumn: golden_cross
+
+		annotation SummarizationSetBy = Automatic
+
+	column death_cross
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 10199e7b-8b0a-493b-91c9-742f24a661f2
+		summarizeBy: none
+		sourceColumn: death_cross
+
+		annotation SummarizationSetBy = Automatic
+
+	column rsi_overbought
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: c4ba2570-745d-420a-ae87-0e58a84f5567
+		summarizeBy: none
+		sourceColumn: rsi_overbought
+
+		annotation SummarizationSetBy = Automatic
+
+	column rsi_oversold
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 9d42a726-8245-40d1-9c81-b6bb6bbd6754
+		summarizeBy: none
+		sourceColumn: rsi_oversold
+
+		annotation SummarizationSetBy = Automatic
+
+	column rsi_recovering
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 0975e452-8aff-4106-8d96-938b00a9452d
+		summarizeBy: none
+		sourceColumn: rsi_recovering
+
+		annotation SummarizationSetBy = Automatic
+
+	column macd_bullish_cross
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 5fea5980-cf41-4f7a-ae08-16a038dc52e0
+		summarizeBy: none
+		sourceColumn: macd_bullish_cross
+
+		annotation SummarizationSetBy = Automatic
+
+	column macd_bearish_cross
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 531fc1e5-86c3-486b-af59-35519faa0ebb
+		summarizeBy: none
+		sourceColumn: macd_bearish_cross
+
+		annotation SummarizationSetBy = Automatic
+
+	column macd_positive
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: d7ddf7f0-b1a3-4617-a7a1-f38f8a53e08c
+		summarizeBy: none
+		sourceColumn: macd_positive
+
+		annotation SummarizationSetBy = Automatic
+
+	column high_volatility
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 2f9a44b9-57aa-4fa2-a50f-f77bf2362668
+		summarizeBy: none
+		sourceColumn: high_volatility
+
+		annotation SummarizationSetBy = Automatic
+
+	column low_volatility
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: d06ec3c6-c90e-4c84-8047-2f5ee66c11c1
+		summarizeBy: none
+		sourceColumn: low_volatility
+
+		annotation SummarizationSetBy = Automatic
+
+	column bollinger_breakout_up
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: bf7d6998-a2a4-40cd-9171-df3df1922510
+		summarizeBy: none
+		sourceColumn: bollinger_breakout_up
+
+		annotation SummarizationSetBy = Automatic
+
+	column bollinger_breakout_down
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 08f40d6b-1e55-4cd1-90cf-16bdab4b2932
+		summarizeBy: none
+		sourceColumn: bollinger_breakout_down
+
+		annotation SummarizationSetBy = Automatic
+
+	column new_20_high
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 1a0f53c9-471f-45bf-a7a9-e742d950f2c9
+		summarizeBy: none
+		sourceColumn: new_20_high
+
+		annotation SummarizationSetBy = Automatic
+
+	column new_20_low
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 251cc0c6-de4b-456d-bf6a-09295de2efe0
+		summarizeBy: none
+		sourceColumn: new_20_low
+
+		annotation SummarizationSetBy = Automatic
+
+	column new_50_high
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: b0be7b71-0631-48fb-8889-6eb65c83d660
+		summarizeBy: none
+		sourceColumn: new_50_high
+
+		annotation SummarizationSetBy = Automatic
+
+	column new_50_low
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 0d239831-098f-4c5e-98c7-1b6ce2f80587
+		summarizeBy: none
+		sourceColumn: new_50_low
+
+		annotation SummarizationSetBy = Automatic
+
+	column breakout_confirmation
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: df7e5953-98b2-4acf-97e8-8ccb26ef91a3
+		summarizeBy: none
+		sourceColumn: breakout_confirmation
+
+		annotation SummarizationSetBy = Automatic
+
+	column timeframe
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 1f050ac0-c962-49cc-9c96-5862509d8a68
+		summarizeBy: none
+		sourceColumn: timeframe
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Clasificacion tecnica por fila para comparaciones de mercado y color semantico.
+	column 'Bias Category' =
+			VAR _ema =
+			    SWITCH(
+			        TRUE(),
+			        [ema_bullish_alignment], 1,
+			        [ema_bearish_alignment], -1,
+			        0
+			    )
+			VAR _macd =
+			    SWITCH(
+			        TRUE(),
+			        [macd_bullish_cross] || [macd_positive], 1,
+			        [macd_bearish_cross], -1,
+			        0
+			    )
+			VAR _rsi =
+			    SWITCH(
+			        TRUE(),
+			        [rsi_normalized] >= 0.60, 1,
+			        [rsi_normalized] <= 0.40, -1,
+			        0
+			    )
+			VAR _bollinger =
+			    SWITCH(
+			        TRUE(),
+			        [bollinger_breakout_up] || [bollinger_position] >= 0.60, 1,
+			        [bollinger_breakout_down] || [bollinger_position] <= 0.40, -1,
+			        0
+			    )
+			VAR _breakout =
+			    SWITCH(
+			        TRUE(),
+			        [breakout_confirmation] && ([new_20_high] || [new_50_high]), 1,
+			        [breakout_confirmation] && ([new_20_low] || [new_50_low]), -1,
+			        0
+			    )
+			VAR _score = _ema + _macd + _rsi + _bollinger + _breakout
+			RETURN
+			    SWITCH(
+			        TRUE(),
+			        _score >= 2, "Bullish",
+			        _score <= -2, "Bearish",
+			        "Neutral"
+			    )
+		dataType: string
+		lineageTag: 29ce5adc-d442-4219-9009-172a2de1576b
+		summarizeBy: none
+
+	partition 'gold market_dataset_bi' = m
+		mode: import
+		source =
+				let
+				    Origen = PostgreSQL.Database("192.168.100.33:5433", "market_data"),
+				    gold_market_dataset_bi = Origen{[Schema="gold",Item="market_dataset_bi"]}[Data]
+				in
+				    gold_market_dataset_bi
+
+	annotation PBI_ResultType = Table

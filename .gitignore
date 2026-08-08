@@ -1,3 +1,13 @@
+# Power BI PBIP - local files
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+**/.pbi/editorSettings.json
+**/~$*
+**/*.tmp
+**/*.bak
+Thumbs.db
+Desktop.ini
+
 .env
 *.pyc
 .pytest_cache/

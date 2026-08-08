@@ -1,0 +1,139 @@
+{
+  "version": "1.1.0",
+  "diagrams": [
+    {
+      "ordinal": 0,
+      "scrollPosition": {
+        "x": 144.63084797413759,
+        "y": 20.181048554530825
+      },
+      "nodes": [
+        {
+          "location": {
+            "x": 1136,
+            "y": 0
+          },
+          "nodeIndex": "gold market_candles_bi",
+          "nodeLineageTag": "538aa74d-aec2-4449-bb71-4856b9c5f12b",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1442.5061412190894,
+            "y": 498.92524925748614
+          },
+          "nodeIndex": "gold market_dataset_bi",
+          "nodeLineageTag": "498c1487-323d-42dc-88f2-cfab06214ee6",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 173.81112634073162,
+            "y": 378.06407335540121
+          },
+          "nodeIndex": "DimDateTime",
+          "nodeLineageTag": "d863bbbb-9a49-4e81-b759-c30cc0622df7",
+          "size": {
+            "height": 296,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1502.2635815287888,
+            "y": 62.81563734220407
+          },
+          "nodeIndex": "DimExchange",
+          "nodeLineageTag": "82b4232f-f3ce-40f5-a770-01de19853108",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1141.5707419446267,
+            "y": 421.88700666341219
+          },
+          "nodeIndex": "DimSymbol",
+          "nodeLineageTag": "16c23a81-0cb7-41ce-8b8a-d4bb42870f3a",
+          "size": {
+            "height": 200,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 782.84776579992911,
+            "y": 364.70028992702305
+          },
+          "nodeIndex": "DimTimeframe",
+          "nodeLineageTag": "969406d5-8b69-4a81-bbc1-2489a0f7519a",
+          "size": {
+            "height": 128,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1612.4524551880572,
+            "y": 335.46262462874307
+          },
+          "nodeIndex": "Technical Indicator Selector",
+          "nodeLineageTag": "b035792c-2d12-449b-863a-f82af01741b1",
+          "size": {
+            "height": 128,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 1896.4524551880572,
+            "y": 335.46262462874307
+          },
+          "nodeIndex": "Technical Signal Matrix",
+          "nodeLineageTag": "9d82ffb6-b1a2-49a1-9116-757ed339eb94",
+          "size": {
+            "height": 128,
+            "width": 234
+          },
+          "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 2180.4524551880572,
+            "y": 323.46262462874307
+          },
+          "nodeIndex": "Technical Signal Types",
+          "nodeLineageTag": "0494bfd1-b009-458b-8a43-4d9441d4c42c",
+          "size": {
+            "height": 152,
+            "width": 234
+          },
+          "zIndex": 0
+        }
+      ],
+      "name": "Todas las tablas",
+      "zoomValue": 89.192590520569553,
+      "pinKeyFieldsToTop": false,
+      "showExtraHeaderInfo": false,
+      "hideKeyFieldsWhenCollapsed": false,
+      "tablesLocked": false
+    }
+  ],
+  "selectedDiagram": "Todas las tablas",
+  "defaultDiagram": "Todas las tablas"
+}

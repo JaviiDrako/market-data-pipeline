@@ -1,0 +1,30 @@
+/// Selector desconectado para cambiar dinámicamente el indicador técnico de la página Technical Analysis & Signals.
+table 'Technical Indicator Selector'
+	lineageTag: b035792c-2d12-449b-863a-f82af01741b1
+
+	column Indicator
+		lineageTag: 9468b198-8fde-47b5-a13a-11ca054d2f99
+		isNameInferred
+		sourceColumn: [Indicator]
+		sortByColumn: Sort
+
+	column Sort
+		lineageTag: 7d4f8daf-0a00-4a6c-aaeb-5438e66ad7f5
+		isNameInferred
+		sourceColumn: [Sort]
+
+	partition 'Technical Indicator Selector' = calculated
+		mode: import
+		source =
+				DATATABLE(
+				    "Indicator", STRING,
+				    "Sort", INTEGER,
+				    {
+				        { "RSI Normalized", 1 },
+				        { "MACD Strength", 2 },
+				        { "MACD Histogram", 3 },
+				        { "ATR %", 4 },
+				        { "Bollinger Position", 5 },
+				        { "Price vs EMA50 %", 6 }
+				    }
+				)

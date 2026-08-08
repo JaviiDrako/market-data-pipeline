@@ -1,0 +1,25 @@
+model Model
+	culture: es-ES
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: es-BO
+	valueFilterBehavior: independent
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBI_QueryOrder = ["gold market_candles_bi","gold market_dataset_bi"]
+
+ref table 'gold market_candles_bi'
+ref table 'gold market_dataset_bi'
+ref table DimExchange
+ref table DimSymbol
+ref table DimTimeframe
+ref table DimDateTime
+ref table 'Technical Indicator Selector'
+ref table 'Technical Signal Matrix'
+ref table 'Technical Signal Types'
+
+ref cultureInfo es-ES

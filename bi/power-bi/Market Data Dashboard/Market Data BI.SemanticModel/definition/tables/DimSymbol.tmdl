@@ -1,0 +1,20 @@
+/// Dimensión compartida de símbolos de mercado que filtra las tablas de velas e indicadores.
+table DimSymbol
+	lineageTag: 16c23a81-0cb7-41ce-8b8a-d4bb42870f3a
+
+	/// Símbolo del par de mercado usado como filtro compartido.
+	column symbol
+		lineageTag: d81d8dbd-f30f-45d3-9100-5611c1fb72e0
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [symbol]
+
+	partition DimSymbol = calculated
+		mode: import
+		source =
+				DISTINCT(
+				    UNION(
+				        SELECTCOLUMNS('gold market_candles_bi', "symbol", 'gold market_candles_bi'[symbol]),
+				        SELECTCOLUMNS('gold market_dataset_bi', "symbol", 'gold market_dataset_bi'[symbol])
+				    )
+				)

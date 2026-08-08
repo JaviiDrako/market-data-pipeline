@@ -1,0 +1,403 @@
+table 'gold market_candles_bi'
+	lineageTag: 538aa74d-aec2-4449-bb71-4856b9c5f12b
+
+	/// Precio de cierre de la última vela visible en el contexto actual.
+	measure 'Latest Close Price' =
+			VAR _LatestTime = MAX('gold market_candles_bi'[open_time])
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_candles_bi'[close_price]),
+			        KEEPFILTERS('gold market_candles_bi'[open_time] = _LatestTime)
+			    )
+		formatString: #,##0.00
+		displayFolder: KPIs / Price
+		lineageTag: d34fca4f-6948-4699-9832-7eaf443a8b97
+
+	/// Precio de apertura de la última vela visible en el contexto actual.
+	measure 'Latest Open Price' =
+			VAR _LatestTime = MAX('gold market_candles_bi'[open_time])
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_candles_bi'[open_price]),
+			        KEEPFILTERS('gold market_candles_bi'[open_time] = _LatestTime)
+			    )
+		formatString: #,##0.00
+		displayFolder: KPIs / Price
+		lineageTag: 0ec2c86d-4479-4365-bd3a-7ef5a322b16a
+
+	/// Precio máximo de la última vela visible en el contexto actual.
+	measure 'Latest High Price' =
+			VAR _LatestTime = MAX('gold market_candles_bi'[open_time])
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_candles_bi'[high_price]),
+			        KEEPFILTERS('gold market_candles_bi'[open_time] = _LatestTime)
+			    )
+		formatString: #,##0.00
+		displayFolder: KPIs / Price
+		lineageTag: 3bc1d2d7-e5fa-4b08-8439-2a02109c7e0b
+
+	/// Precio mínimo de la última vela visible en el contexto actual.
+	measure 'Latest Low Price' =
+			VAR _LatestTime = MAX('gold market_candles_bi'[open_time])
+			RETURN
+			    CALCULATE(
+			        MIN('gold market_candles_bi'[low_price]),
+			        KEEPFILTERS('gold market_candles_bi'[open_time] = _LatestTime)
+			    )
+		formatString: #,##0.00
+		displayFolder: KPIs / Price
+		lineageTag: 505f2558-e4f9-4391-968b-255026e62396
+
+	/// Marca temporal de apertura de la última vela visible.
+	measure 'Latest Data Time' = MAX('gold market_candles_bi'[open_time])
+		formatString: dd MMM yyyy HH:mm
+		displayFolder: KPIs / Price
+		lineageTag: f61d6d28-5060-4eab-a92c-e65fefc4afd2
+
+	/// Precio de apertura de la primera vela del periodo visible.
+	measure 'Period Open Price' =
+			VAR _FirstTime = MIN('gold market_candles_bi'[open_time])
+			RETURN
+			    CALCULATE(
+			        MIN('gold market_candles_bi'[open_price]),
+			        KEEPFILTERS('gold market_candles_bi'[open_time] = _FirstTime)
+			    )
+		formatString: #,##0.00
+		displayFolder: KPIs / Price
+		lineageTag: 2c9f4635-1a36-4b3c-960e-8dfb368715ee
+
+	/// Precio de cierre de la última vela del periodo visible.
+	measure 'Period Close Price' =
+			VAR _LastTime = MAX('gold market_candles_bi'[open_time])
+			RETURN
+			    CALCULATE(
+			        MAX('gold market_candles_bi'[close_price]),
+			        KEEPFILTERS('gold market_candles_bi'[open_time] = _LastTime)
+			    )
+		formatString: #,##0.00
+		displayFolder: KPIs / Price
+		lineageTag: b3b95b76-de38-4839-9051-104779bc072c
+
+	/// Variación relativa entre la apertura inicial y el cierre final del periodo visible.
+	measure 'Period Change %' =
+			VAR _OpenPrice = [Period Open Price]
+			VAR _ClosePrice = [Period Close Price]
+			RETURN
+			    IF(
+			        ISBLANK(_OpenPrice) || _OpenPrice = 0 || ISBLANK(_ClosePrice),
+			        BLANK(),
+			        DIVIDE(_ClosePrice - _OpenPrice, _OpenPrice)
+			    )
+		formatString: 0.00%
+		displayFolder: KPIs / Price
+		lineageTag: 330ab895-628f-459b-95cf-7462a94fbee2
+
+	/// Precio máximo observado dentro del contexto visible.
+	measure 'Period High' = MAX('gold market_candles_bi'[high_price])
+		formatString: #,##0.00
+		displayFolder: KPIs / Price
+		lineageTag: e12b87cb-8648-4c19-b5a9-d7f2c4d9dbdb
+
+	/// Precio mínimo observado dentro del contexto visible.
+	measure 'Period Low' = MIN('gold market_candles_bi'[low_price])
+		formatString: #,##0.00
+		displayFolder: KPIs / Price
+		lineageTag: 072bb983-84d1-43d1-85da-6c86cfe8b732
+
+	/// Volumen total negociado en todas las velas visibles.
+	measure 'Total Volume' = SUM('gold market_candles_bi'[volume])
+		displayFolder: KPIs / Volume
+		lineageTag: 088be79e-9d0e-40a9-a062-03cf3178d533
+
+		formatStringDefinition = SWITCH(TRUE(), ABS([Total Volume]) >= 1000000000, "0.00,,,B", ABS([Total Volume]) >= 1000000, "0.00,,M", ABS([Total Volume]) >= 1000, "0.00,K", "#,##0.00")
+
+	/// Volumen correspondiente a la última vela visible.
+	measure 'Latest Candle Volume' =
+			VAR _LatestTime = MAX('gold market_candles_bi'[open_time])
+			RETURN
+			    CALCULATE(
+			        SUM('gold market_candles_bi'[volume]),
+			        KEEPFILTERS('gold market_candles_bi'[open_time] = _LatestTime)
+			    )
+		displayFolder: KPIs / Volume
+		lineageTag: ad9c10b6-a852-478d-be2a-0a772b5ff45f
+
+		formatStringDefinition = SWITCH(TRUE(), ABS([Latest Candle Volume]) >= 1000000000, "0.00,,,B", ABS([Latest Candle Volume]) >= 1000000, "0.00,,M", ABS([Latest Candle Volume]) >= 1000, "0.00,K", "#,##0.00")
+
+	/// Volumen promedio por vela en el contexto visible.
+	measure 'Average Candle Volume' = AVERAGE('gold market_candles_bi'[volume])
+		displayFolder: Charts / Volume
+		lineageTag: 1677113b-dedc-433c-bdfa-a8514a4d8280
+
+		formatStringDefinition = SWITCH(TRUE(), ABS([Average Candle Volume]) >= 1000000000, "0.00,,,B", ABS([Average Candle Volume]) >= 1000000, "0.00,,M", ABS([Average Candle Volume]) >= 1000, "0.00,K", "#,##0.00")
+
+	/// Precio de cierre explícito para visuales temporales al grano de vela.
+	measure 'Close Price' = MAX('gold market_candles_bi'[close_price])
+		formatString: #,##0.00
+		displayFolder: Charts / Price
+		lineageTag: d4234de9-1fa8-471d-aad4-7ba6fcd45550
+
+	/// Cantidad de velas dentro del contexto visible.
+	measure 'Candle Count' = COUNTROWS('gold market_candles_bi')
+		formatString: #,##0
+		displayFolder: Charts / Price
+		lineageTag: 53106f4f-c040-463c-926f-4ecab2cccb6d
+
+	column exchange
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 285e7422-377a-47b5-b23e-f59277aad700
+		summarizeBy: none
+		sourceColumn: exchange
+
+		annotation SummarizationSetBy = Automatic
+
+	column symbol
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: c7988a36-9ef4-4c83-aa1f-d545b823c63c
+		summarizeBy: none
+		sourceColumn: symbol
+
+		annotation SummarizationSetBy = Automatic
+
+	column open_time
+		dataType: dateTime
+		isHidden
+		formatString: dd MMM yyyy HH:mm
+		lineageTag: 74d64603-3fa6-4990-ab93-adb500176460
+		summarizeBy: none
+		sourceColumn: open_time
+
+		annotation SummarizationSetBy = Automatic
+
+	column close_time
+		dataType: dateTime
+		isHidden
+		formatString: dd MMM yyyy HH:mm
+		isAvailableInMdx: false
+		lineageTag: b9b2a6f9-b7e5-4f97-9c60-e662d3ff3963
+		summarizeBy: none
+		sourceColumn: close_time
+
+		annotation SummarizationSetBy = Automatic
+
+	column open_price
+		dataType: double
+		formatString: #,##0.00
+		lineageTag: cc00553c-11e4-4572-bfdc-fe5aba2f6c9f
+		summarizeBy: sum
+		sourceColumn: open_price
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column high_price
+		dataType: double
+		formatString: #,##0.00
+		lineageTag: 78f518f0-c920-40d7-b7b1-da3748716b26
+		summarizeBy: sum
+		sourceColumn: high_price
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column low_price
+		dataType: double
+		formatString: #,##0.00
+		lineageTag: d80fb550-8b8f-4b04-937a-641fec0d6c3e
+		summarizeBy: sum
+		sourceColumn: low_price
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column close_price
+		dataType: double
+		formatString: #,##0.00
+		lineageTag: 5fde0045-a19a-4df5-b52b-c461fe95269c
+		summarizeBy: sum
+		sourceColumn: close_price
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column volume
+		dataType: double
+		formatString: #,##0.00
+		lineageTag: 27e70b6c-f87f-45ad-9b84-19367003a4f6
+		summarizeBy: sum
+		sourceColumn: volume
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column quote_asset_volume
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: c5ed8917-d919-42e2-ac0b-4dc9a25ecbbb
+		summarizeBy: sum
+		sourceColumn: quote_asset_volume
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column number_of_trades
+		dataType: int64
+		isHidden
+		formatString: 0
+		isAvailableInMdx: false
+		lineageTag: 90287ee2-efe4-4181-91a2-8edfaeeb26da
+		summarizeBy: sum
+		sourceColumn: number_of_trades
+
+		annotation SummarizationSetBy = Automatic
+
+	column taker_buy_base_volume
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: e8e2b08d-a920-4d1a-916b-5f26f5559d06
+		summarizeBy: sum
+		sourceColumn: taker_buy_base_volume
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column taker_buy_quote_volume
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: bd4ff4ff-e48f-446b-aceb-522f235f47e4
+		summarizeBy: sum
+		sourceColumn: taker_buy_quote_volume
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ingested_at
+		dataType: dateTime
+		isHidden
+		formatString: dd MMM yyyy HH:mm
+		isAvailableInMdx: false
+		lineageTag: ff1c5e17-d3e9-494d-a963-6ddee6f928e3
+		summarizeBy: none
+		sourceColumn: ingested_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column candle_direction
+		dataType: int64
+		isHidden
+		formatString: 0
+		isAvailableInMdx: false
+		lineageTag: 85628b14-fc01-400f-bec8-4fc584160e0f
+		summarizeBy: sum
+		sourceColumn: candle_direction
+
+		annotation SummarizationSetBy = Automatic
+
+	column body_size
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: b40b0dc5-0da3-45e9-8515-0e671ac4c2dc
+		summarizeBy: sum
+		sourceColumn: body_size
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column upper_wick
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: a3955025-96a7-4911-9215-59a9d2e95062
+		summarizeBy: sum
+		sourceColumn: upper_wick
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column lower_wick
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: e5e405e6-b04f-4da9-bc9e-e585074122a4
+		summarizeBy: sum
+		sourceColumn: lower_wick
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column candle_range
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 75644d7e-91eb-42ad-bb8a-9f34bc916b44
+		summarizeBy: sum
+		sourceColumn: candle_range
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column typical_price
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 704904c8-de96-41e3-b93c-4a132a75bc75
+		summarizeBy: sum
+		sourceColumn: typical_price
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column ohlc_average
+		dataType: double
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 83fc71d3-ed43-4504-b474-12cfcde58764
+		summarizeBy: sum
+		sourceColumn: ohlc_average
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column timeframe
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		lineageTag: 7653b561-1f91-4c2c-8078-750b0d41f796
+		summarizeBy: none
+		sourceColumn: timeframe
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'gold market_candles_bi' = m
+		mode: import
+		source =
+				let
+				    Origen = PostgreSQL.Database("192.168.100.33:5433", "market_data"),
+				    gold_market_candles_bi = Origen{[Schema="gold",Item="market_candles_bi"]}[Data]
+				in
+				    gold_market_candles_bi
+
+	annotation PBI_ResultType = Table

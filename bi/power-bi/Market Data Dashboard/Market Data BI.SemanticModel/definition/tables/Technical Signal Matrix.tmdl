@@ -1,0 +1,30 @@
+/// Eje desconectado para la matriz nativa de confirmación técnica.
+table 'Technical Signal Matrix'
+	lineageTag: 9d82ffb6-b1a2-49a1-9116-757ed339eb94
+
+	column Signal
+		lineageTag: b8d08931-185a-4921-a382-31cfc55f78c7
+		isNameInferred
+		sourceColumn: [Signal]
+		sortByColumn: Sort
+
+	column Sort
+		lineageTag: a872e9d2-aa21-49ba-a470-366196a7d837
+		isNameInferred
+		sourceColumn: [Sort]
+
+	partition 'Technical Signal Matrix' = calculated
+		mode: import
+		source =
+				DATATABLE(
+				    "Signal", STRING,
+				    "Sort", INTEGER,
+				    {
+				        { "EMA Alignment", 1 },
+				        { "MACD", 2 },
+				        { "RSI", 3 },
+				        { "Bollinger", 4 },
+				        { "Breakout", 5 },
+				        { "Resultado", 6 }
+				    }
+				)

@@ -1,0 +1,34 @@
+/// Dimensión compartida de intervalos temporales con orden de presentación definido.
+table DimTimeframe
+	lineageTag: 969406d5-8b69-4a81-bbc1-2489a0f7519a
+
+	/// Intervalo temporal de las velas e indicadores.
+	column timeframe
+		lineageTag: f2468b2f-dbb2-4c64-af72-c3f1ac8db7ea
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [timeframe]
+		sortByColumn: sort_order
+
+	/// Orden técnico de presentación de los intervalos temporales.
+	column sort_order
+		isHidden
+		lineageTag: f4c98214-a2bc-42cf-997b-ee7bf3630e4e
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [sort_order]
+
+	partition DimTimeframe = calculated
+		mode: import
+		source =
+				DATATABLE(
+				    "timeframe", STRING,
+				    "sort_order", INTEGER,
+				    {
+				        { "5m", 1 },
+				        { "15m", 2 },
+				        { "30m", 3 },
+				        { "1h", 4 },
+				        { "1d", 5 }
+				    }
+				)

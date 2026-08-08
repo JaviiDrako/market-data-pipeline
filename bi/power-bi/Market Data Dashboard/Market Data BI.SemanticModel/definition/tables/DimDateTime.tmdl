@@ -1,0 +1,101 @@
+/// Dimensión temporal compartida al grano de cada open_time existente en las tablas de hechos.
+table DimDateTime
+	lineageTag: d863bbbb-9a49-4e81-b759-c30cc0622df7
+	dataCategory: Time
+
+	/// Marca temporal de apertura compartida por ambas tablas de hechos.
+	column open_time
+		formatString: dd MMM yyyy HH:mm
+		lineageTag: 5efd340a-e8fb-40e8-9049-24babf6e347f
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [open_time]
+
+	/// Fecha calendario correspondiente a la apertura de la vela.
+	column date
+		formatString: dd MMM yyyy
+		lineageTag: 65846fb9-1c7f-4118-8fd8-7d6f235c6e76
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [date]
+
+	/// Año calendario de la apertura de la vela.
+	column year
+		formatString: 0
+		lineageTag: 2c32d5d4-4fdf-4fc8-8955-9fd6c9d88b5f
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [year]
+
+	/// Número de mes usado para ordenar el nombre del mes.
+	column month_number
+		isHidden
+		formatString: 0
+		lineageTag: 5806a87c-1f23-4b33-8466-d1b4daee8ca4
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [month_number]
+
+	/// Nombre del mes de apertura de la vela.
+	column month_name
+		lineageTag: f761a487-91a0-44ba-8d1f-b9cb06306ae7
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [month_name]
+		sortByColumn: month_number
+
+	/// Día del mes de apertura de la vela.
+	column day
+		formatString: 0
+		lineageTag: 7a773244-8573-4478-a119-ecf946294519
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [day]
+
+	/// Hora de apertura de la vela.
+	column hour
+		formatString: 0
+		lineageTag: 8c04151a-46c9-4275-b005-c2f1bf0c66b4
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [hour]
+
+	/// Minuto de apertura de la vela.
+	column minute
+		formatString: 0
+		lineageTag: 01837af0-e66b-4a8c-bc46-314de90d2554
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [minute]
+
+	/// Etiqueta legible de fecha y hora para ejes y tablas.
+	column date_label
+		lineageTag: bb653a03-96cc-4e1b-9db6-34dfd062961d
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [date_label]
+		sortByColumn: open_time
+
+	partition DimDateTime = calculated
+		mode: import
+		source =
+				VAR _OpenTimes =
+				    DISTINCT(
+				        UNION(
+				            SELECTCOLUMNS('gold market_candles_bi', "open_time", 'gold market_candles_bi'[open_time]),
+				            SELECTCOLUMNS('gold market_dataset_bi', "open_time", 'gold market_dataset_bi'[open_time])
+				        )
+				    )
+				RETURN
+				    SELECTCOLUMNS(
+				        _OpenTimes,
+				        "open_time", [open_time],
+				        "date", DATE(YEAR([open_time]), MONTH([open_time]), DAY([open_time])),
+				        "year", YEAR([open_time]),
+				        "month_number", MONTH([open_time]),
+				        "month_name", FORMAT([open_time], "MMMM"),
+				        "day", DAY([open_time]),
+				        "hour", HOUR([open_time]),
+				        "minute", MINUTE([open_time]),
+				        "date_label", FORMAT([open_time], "dd MMM yyyy HH:mm")
+				    )
