@@ -6,7 +6,7 @@ The project ingests raw market data from Binance, persists it in a PostgreSQL Da
 
 It is designed as a clean data foundation for:
 
-- **Business Intelligence** dashboards (pending)
+- **Power BI** analytics dashboards
 - **Algorithmic trading** systems (pending)
 - **Machine Learning** feature stores (pending)
 
@@ -19,24 +19,25 @@ It is designed as a clean data foundation for:
 1. [Purpose](#purpose)
 2. [Architecture overview](#architecture-overview)
 3. [Medallion Architecture](#medallion-architecture)
-4. [Technology stack](#technology-stack)
-5. [Project structure](#project-structure)
-6. [Current status](#current-status)
-7. [Requirements](#requirements)
-8. [Getting started (from zero)](#getting-started-from-zero)
-9. [Configuration](#configuration)
-10. [Logging](#logging)
-11. [How to run the Bootstrap pipeline](#how-to-run-the-bootstrap-pipeline)
-12. [How to run the Incremental pipeline](#how-to-run-the-incremental-pipeline)
-13. [Airflow](#airflow)
-14. [dbt](#dbt)
-15. [PostgreSQL](#postgresql)
-16. [Testing](#testing)
-17. [CI / GitHub Actions](#ci--github-actions)
-18. [Branching model](#branching-model)
-19. [Documentation](#documentation)
-20. [Roadmap](#roadmap)
-21. [License](#license)
+4. [Business Intelligence](#business-intelligence)
+5. [Technology stack](#technology-stack)
+6. [Project structure](#project-structure)
+7. [Current status](#current-status)
+8. [Requirements](#requirements)
+9. [Getting started (from zero)](#getting-started-from-zero)
+10. [Configuration](#configuration)
+11. [Logging](#logging)
+12. [How to run the Bootstrap pipeline](#how-to-run-the-bootstrap-pipeline)
+13. [How to run the Incremental pipeline](#how-to-run-the-incremental-pipeline)
+14. [Airflow](#airflow)
+15. [dbt](#dbt)
+16. [PostgreSQL](#postgresql)
+17. [Testing](#testing)
+18. [CI / GitHub Actions](#ci--github-actions)
+19. [Branching model](#branching-model)
+20. [Documentation](#documentation)
+21. [Roadmap](#roadmap)
+22. [License](#license)
 
 ---
 
@@ -105,8 +106,8 @@ Build a maintainable, auditable and extensible market-data platform that:
                               │
               ┌───────────────┼───────────────┐
               ▼               ▼               ▼
-         BI / Dashboards  Trading Bot    Machine Learning
-           (pending)       (pending)        (pending)
+         Power BI       Trading Bot    Machine Learning
+        (implemented)      (pending)        (pending)
 ```
 
 **Orchestration (Airflow)**
@@ -158,6 +159,21 @@ Primary consumer tables: **`gold.market_dataset_*`** (keys + features + signals 
 
 ---
 
+## Business Intelligence
+
+Power BI is the current analytics consumption layer for the Gold warehouse. The
+versioned report combines `gold.market_dataset_bi` and
+`gold.market_candles_bi` through a shared semantic model for executive,
+technical, and cross-market analysis.
+
+[![Executive Overview](bi/power-bi/screenshots/executive-overview.png)](bi/power-bi/README.md)
+
+- [BI layer overview](bi/README.md)
+- [Power BI project documentation](bi/power-bi/README.md)
+- [View Interactive Power BI Report](https://app.powerbi.com/view?r=eyJrIjoiNjBlZTAwYWYtOGVmMC00N2NmLTkyYTEtODM2M2I1OTk1YWQ3IiwidCI6ImM1NWUwZDRlLTM4YmQtNDllZS1hZGE0LWIzYzQ1MWI0NWU2MyIsImMiOjR9)
+
+---
+
 ## Technology stack
 
 | Category | Technology |
@@ -194,6 +210,8 @@ market-data-pipeline/
 │   ├── .env.example               # Copy to docker/.env
 │   ├── postgres/init/             # Warehouse + Bronze DDL
 │   └── airflow/
+├── bi/                            # Business Intelligence consumption layer
+│   └── power-bi/                  # Versioned Power BI PBIP project
 ├── docs/                          # Architecture, database, ADRs, roadmap
 ├── src/
 │   ├── clients/                   # Binance REST client
@@ -234,7 +252,7 @@ market-data-pipeline/
 | Centralized Python logging (`get_logger`) | ✅ Implemented |
 | GitHub Actions CI (unit + dbt parse) | ✅ Implemented |
 | Mermaid architecture diagrams | ✅ Implemented |
-| BI / Dashboards | ⏳ Pending |
+| Power BI analytics dashboard | ✅ Implemented |
 | Trading Bot | ⏳ Pending |
 | Machine Learning pipelines | ⏳ Pending |
 | Additional exchanges | ⏳ Pending |
@@ -635,6 +653,8 @@ Workflow used in this project:
 
 | Path | Content |
 |------|---------|
+| [`bi/README.md`](bi/README.md) | Business Intelligence layer overview |
+| [`bi/power-bi/README.md`](bi/power-bi/README.md) | Power BI dashboard, semantic model and report pages |
 | [`docs/README.md`](docs/README.md) | Full documentation index |
 | [`docs/architecture/`](docs/architecture/) | System, Airflow, Bootstrap, Warehouse, Data Quality, future improvements |
 | [`docs/diagrams/`](docs/diagrams/) | Mermaid diagrams (architecture, flows, medallion) |
@@ -657,12 +677,13 @@ Workflow used in this project:
 - Unit and integration test suites
 - Centralized logging and GitHub Actions CI
 - Mermaid architecture diagrams
+- Power BI analytics dashboard backed by Gold BI consumption views
 
 ### Pending (not implemented — do not treat as available)
 
 | Area | Status |
 |------|--------|
-| **BI / Dashboards** | Pending |
+| **Additional BI implementations** (Evidence, Rill, Tableau, …) | Future |
 | **Trading Bot** | Pending |
 | **Machine Learning** | Pending |
 | Additional data providers (Yahoo, Coinbase, …) | Pending |
